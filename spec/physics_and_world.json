@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.4.0",
+  "coordinateSystem": {
+    "origin": "bottom-left",
+    "units": "logical_pixels (points)",
+    "activeFrameRate": 60,
+    "normalFrameRate": 30,
+    "idleFrameRate": 15,
+    "windowPollIntervalSeconds": 0.08
+  },
+  "populationLimits": {
+    "maxConcurrentCharacters": 4,
+    "allowDuplicateCharacters": false,
+    "initialSpawnCharacters": ["hachiware"]
+  },
+  "physicsConstants": {
+    "gravity": -1450.0,
+    "terminalVelocity": -1200.0,
+    "airResistance": 0.99,
+    "groundFriction": 0.85,
+    "walkSpeed": 62.0,
+    "landingSnapTolerance": 16.0,
+    "windowTrackingMaxSnapDeltaY": 240.0,
+    "edgeDropProbability": 0.2,
+    "bounceRestitution": 0.15
+  },
+  "jumpAndClimbRules": {
+    "enableStepJump": true,
+    "maxStepJumpHeightRatio": 0.55,
+    "minStepJumpHeightPoints": 8.0,
+    "stepJumpHorizontalReach": 36.0,
+    "stepJumpDurationSeconds": 0.38,
+    "stepJumpArcPeakOffset": 22.0,
+    "stepJumpProbability": 0.85,
+    "enableWindowEdgeClimb": true,
+    "climbTriggerDistanceX": 26.0,
+    "climbProbability": 0.70,
+    "climbSpeed": 54.0,
+    "minClimbHeightForRestRatio": 1.6,
+    "climbRestSegmentDistanceRatio": 1.35,
+    "climbRestDurationSeconds": 1.25,
+    "description": "Characters walking near a higher platform within maxStepJumpHeightRatio (0.55x character height, ~46pt) hop up onto it (JUMP_STEP). Characters encountering the left or right vertical side edge of a taller window can grab the edge and climb up (CLIMB_WALL) to its top surface. If the climb height exceeds minClimbHeightForRestRatio * characterHeight, the character pauses midway (CLIMB_REST) to catch its breath before finishing the climb."
+  },
+  "windowRidingRules": {
+    "followMovingWindow": true,
+    "freeFallWhenOutOfScreenBounds": true,
+    "freeFallWhenCharacterExceedsWindowEdge": true,
+    "requireFullCharacterBodyInsideScreen": true,
+    "description": "When a character is standing on or climbing a window (windowID != 0), its position moves by the window's deltaX and deltaY. If moving the window pushes any part of the character's body (width or height) outside the screen's visibleFrame or off the window, the character detaches from the window and enters free-fall (FALL) clamped inside the screen."
+  },
+  "characterDimensions": {
+    "width": 84.0,
+    "height": 84.0,
+    "hitboxPadding": 6.0,
+    "grabAnchorOffsetY": 56.0,
+    "dirtyRectMargin": 48.0,
+    "availableScales": {
+      "small": 0.75,
+      "normal": 1.0,
+      "large": 1.35
+    }
+  },
+  "windowDetectionRules": {
+    "allowedWindowLayers": [0],
+    "minWindowWidth": 140.0,
+    "minWindowHeight": 90.0,
+    "minTopClearanceFromScreenTop": 24.0,
+    "ignoredOwnerNames": [
+      "Window Server",
+      "Dock",
+      "Control Center",
+      "Notification Center",
+      "Spotlight",
+      "SystemUIServer",
+      "Screenshot",
+      "ChiikawaDesktop"
+    ],
+    "occludeLowerWindows": true,
+    "description": "Standard desktop windows (layer 0) are converted into walkable PlatformSegments with left/right vertical side bounds for climbing. Front windows occlude the top edges of windows behind them."
+  }
+}

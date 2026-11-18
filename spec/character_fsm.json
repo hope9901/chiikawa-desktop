@@ -1,0 +1,318 @@
+{
+  "schemaVersion": "1.4.0",
+  "initialState": "FALL",
+  "maxCharacters": 4,
+  "assetsRootDirectory": "assets",
+  "stateAssetFolders": {
+    "IDLE": "idle",
+    "WALK": "walk",
+    "JUMP_STEP": "jump",
+    "CLIMB_WALL": "climb",
+    "CLIMB_REST": "climb_rest",
+    "CRY_CLICK": "cry_click",
+    "DRAGGED_STRUGGLE": "dragged_struggle",
+    "FALL": "fall",
+    "FALL_FROM_GRAB": "fall",
+    "TUMBLE": "tumble"
+  },
+  "stateAnimationFPS": {
+    "IDLE": 6.0,
+    "WALK": 10.0,
+    "JUMP_STEP": 10.0,
+    "CLIMB_WALL": 9.0,
+    "CLIMB_REST": 6.0,
+    "CRY_CLICK": 10.0,
+    "DRAGGED_STRUGGLE": 14.0,
+    "FALL": 8.0,
+    "FALL_FROM_GRAB": 8.0,
+    "TUMBLE": 8.0
+  },
+  "defaultCharacters": [
+    {
+      "id": "chiikawa",
+      "displayName": "치이카와 (Chiikawa)",
+      "assetFolder": "assets/chiikawa",
+      "primaryColorHex": "#FFFDF9",
+      "accentColorHex": "#FFB7C5",
+      "earStyle": "round",
+      "catchphrases": ["( ´•̥×•̥` )", "와..!", "우와아앙!!", "( ˶ˆᗜˆ˵ )"]
+    },
+    {
+      "id": "hachiware",
+      "displayName": "하치와레 (Hachiware)",
+      "assetFolder": "assets/hachiware",
+      "primaryColorHex": "#FFFDF9",
+      "accentColorHex": "#6CA6CD",
+      "earStyle": "pointed_blue",
+      "catchphrases": ["어라라..?", "어떻게든 되겠지!", "으아아앙!", "( ˊᵕˋ )♡"]
+    },
+    {
+      "id": "usagi",
+      "displayName": "우사기 (Usagi)",
+      "assetFolder": "assets/usagi",
+      "primaryColorHex": "#FFF3C4",
+      "accentColorHex": "#FFD166",
+      "earStyle": "long_rabbit",
+      "catchphrases": ["우라!!", "야하~!", "하아?!", "푸루루루!"]
+    },
+    {
+      "id": "momonga",
+      "displayName": "모몽가 (Momonga)",
+      "assetFolder": "assets/momonga",
+      "primaryColorHex": "#F5F7FA",
+      "accentColorHex": "#B8C4E0",
+      "earStyle": "fluffy_squirrel",
+      "catchphrases": ["귀여워해라!", "내놔!!", "으앙!! 봐라!", "( `꒳´ )"]
+    }
+  ],
+  "interactionTimings": {
+    "holdThresholdSeconds": 0.18,
+    "clickCryDurationSeconds": 1.6,
+    "tumbleDurationSeconds": 1.15,
+    "speechBubbleDurationSeconds": 2.2,
+    "idleMinDurationSeconds": 2.0,
+    "idleMaxDurationSeconds": 4.8,
+    "walkMinDurationSeconds": 2.5,
+    "walkMaxDurationSeconds": 6.0
+  },
+  "states": {
+    "IDLE": {
+      "description": "Standing still on a window top edge or the desktop floor. Moves along with the window if the window is dragged.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "ridesMovingWindow": true,
+      "visualExpression": "happy_blink",
+      "transitions": [
+        {
+          "event": "TIMER_EXPIRED",
+          "targetState": "WALK",
+          "description": "After random idle duration (if wandering is enabled), start walking left or right."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the underlying window closes, or if dragging the window pushes the character outside the screen/window bounds, detach and enter free-fall (FALL)."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "CRY_CLICK",
+          "description": "When clicked, immediately start crying. If mouse stays pressed beyond holdThresholdSeconds or drags, transitions to DRAGGED_STRUGGLE."
+        }
+      ]
+    },
+    "WALK": {
+      "description": "Walking horizontally along the current platform while also detecting small ledges to jump up or window side edges to climb.",
+      "gravityEnabled": false,
+      "horizontalMovement": true,
+      "ridesMovingWindow": true,
+      "visualExpression": "walk_waddle",
+      "transitions": [
+        {
+          "event": "LOW_LEDGE_DETECTED",
+          "targetState": "JUMP_STEP",
+          "description": "When a platform ahead is higher by up to ~0.55x character height, hop up onto that platform."
+        },
+        {
+          "event": "WINDOW_SIDE_EDGE_DETECTED",
+          "targetState": "CLIMB_WALL",
+          "description": "When encountering the left or right vertical edge of a taller window, grab the edge and start climbing up toward its top surface."
+        },
+        {
+          "event": "TIMER_EXPIRED",
+          "targetState": "IDLE",
+          "description": "After random walk duration, pause and return to IDLE."
+        },
+        {
+          "event": "PLATFORM_EDGE_REACHED",
+          "targetState": "TURN_OR_DROP",
+          "description": "At platform edge: reverse direction (1 - edgeDropProbability) or step off into FALL (edgeDropProbability, if not on floor)."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the underlying window closes or moves so the character exceeds screen/window bounds, enter free-fall."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "CRY_CLICK",
+          "description": "When clicked, immediately start crying."
+        }
+      ]
+    },
+    "JUMP_STEP": {
+      "description": "Hopping along a parabolic arc onto a nearby platform that is up to half a character-height higher.",
+      "gravityEnabled": false,
+      "horizontalMovement": true,
+      "ridesMovingWindow": true,
+      "visualExpression": "hop_up",
+      "transitions": [
+        {
+          "event": "JUMP_COMPLETED",
+          "targetState": "WALK",
+          "description": "Land smoothly on the target upper ledge and continue walking."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the target platform disappears or moves out of bounds mid-jump, enter free-fall."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "Grabbed in mid-air during jump."
+        }
+      ]
+    },
+    "CLIMB_WALL": {
+      "description": "Climbing vertically up the left or right edge of an application window toward its top edge.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "ridesMovingWindow": true,
+      "visualExpression": "climb_effort",
+      "transitions": [
+        {
+          "event": "CLIMB_REST_HEIGHT_REACHED",
+          "targetState": "CLIMB_REST",
+          "description": "When climbing a tall window and the distance climbed exceeds climbRestSegmentDistanceRatio * characterHeight, pause to rest."
+        },
+        {
+          "event": "WINDOW_TOP_REACHED",
+          "targetState": "WALK",
+          "description": "Upon reaching the top edge of the window, step onto the top surface and walk."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the window closes or moves so the character exceeds screen bounds, let go and enter free-fall."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "Pulled off the window wall by the mouse cursor."
+        }
+      ]
+    },
+    "CLIMB_REST": {
+      "description": "Clinging to the side edge of a tall window midway up, catching breath with sweat drops before resuming the climb.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "ridesMovingWindow": true,
+      "visualExpression": "climb_panting",
+      "transitions": [
+        {
+          "event": "TIMER_EXPIRED",
+          "targetState": "CLIMB_WALL",
+          "description": "After climbRestDurationSeconds, resume climbing up toward the top of the window."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the window disappears or moves out of screen bounds while resting, enter free-fall."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "Pulled off the wall by the mouse."
+        }
+      ]
+    },
+    "CRY_CLICK": {
+      "description": "Triggered immediately on mouse click. Character stops and cries with tears while riding the window if on one.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "ridesMovingWindow": true,
+      "visualExpression": "crying_tears",
+      "transitions": [
+        {
+          "event": "MOUSE_HOLD_OR_DRAG",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "If mouse button is held longer than holdThresholdSeconds (0.18s) or dragged, transition to struggling in mid-air."
+        },
+        {
+          "event": "TIMER_EXPIRED",
+          "targetState": "IDLE",
+          "description": "If mouse was released quickly (a single click), finish crying after clickCryDurationSeconds and resume IDLE."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If not held by mouse and platform disappears or pushes character out of screen bounds, fall."
+        }
+      ]
+    },
+    "DRAGGED_STRUGGLE": {
+      "description": "Mouse button is held down. Character is lifted by the cursor, crying and flailing its arms/legs.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "followsMouseCursor": true,
+      "visualExpression": "crying_flailing",
+      "transitions": [
+        {
+          "event": "MOUSE_UP",
+          "targetState": "FALL_FROM_GRAB",
+          "description": "When mouse button is released, drop from current cursor position and fall."
+        }
+      ]
+    },
+    "FALL": {
+      "description": "Normal falling under gravity (e.g., walked off a window edge, window closed, or ejected when window moved near screen edge).",
+      "gravityEnabled": true,
+      "horizontalMovement": true,
+      "visualExpression": "surprised_fall",
+      "transitions": [
+        {
+          "event": "LANDED_ON_PLATFORM",
+          "targetState": "TUMBLE",
+          "description": "Upon landing on a window top or floor (where the character fits within screen bounds), play tumble/fall-over motion."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "Can be caught in mid-air by clicking and holding."
+        }
+      ]
+    },
+    "FALL_FROM_GRAB": {
+      "description": "Falling after being held/dragged and released by the user.",
+      "gravityEnabled": true,
+      "horizontalMovement": true,
+      "visualExpression": "crying_fall",
+      "transitions": [
+        {
+          "event": "LANDED_ON_PLATFORM",
+          "targetState": "TUMBLE",
+          "description": "When hitting a window top edge or the desktop floor, play the falling-over (tumble) animation at that spot."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "DRAGGED_STRUGGLE",
+          "description": "Can be grabbed again in mid-air."
+        }
+      ]
+    },
+    "TUMBLE": {
+      "description": "Landing impact / falling-over motion after dropping onto a surface. After recovering, resumes activity at the landed location.",
+      "gravityEnabled": false,
+      "horizontalMovement": false,
+      "ridesMovingWindow": true,
+      "visualExpression": "tumble_dizzy",
+      "transitions": [
+        {
+          "event": "TIMER_EXPIRED",
+          "targetState": "IDLE",
+          "description": "After tumbleDurationSeconds, stand back up at the landed position and transition to IDLE (then WALK)."
+        },
+        {
+          "event": "PLATFORM_LOST_OR_OUT_OF_BOUNDS",
+          "targetState": "FALL",
+          "description": "If the window disappears or pushes character out of screen bounds while tumbling, fall again."
+        },
+        {
+          "event": "MOUSE_DOWN",
+          "targetState": "CRY_CLICK",
+          "description": "Clicked while tumbling."
+        }
+      ]
+    }
+  }
+}

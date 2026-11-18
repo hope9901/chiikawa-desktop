@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "1.4.0",
+  "projectName": "ChiikawaDesktop",
+  "description": "Platform-agnostic architecture specification for the Desktop Chiikawa pet application. Inspired by ssskay/desktop-chiikawa-macos with added window-top walking physics, window-riding movement tracking, small-step jumping, window-edge climbing with mid-climb rest, cry/struggle/tumble interactions, and strict low-resource optimization.",
+  "designPrinciples": [
+    "Spec-Driven Development: All logic, state machines, and constants originate in spec/*.json.",
+    "Dual-Update Rule: Any modification to behavior, structure, or parameters MUST be applied to both spec/*.json and the native platform source code.",
+    "Coordinate System Normalization: Internally uses a bottom-left origin (x: left-to-right, y: bottom-to-top where 0 is the bottom of the screen) so physics calculations remain identical across OSes.",
+    "Low-Resource Footprint: Avoid full-screen redraws. Use dirty-rect invalidation, adaptive tick rates (30 FPS normal, 60 FPS during drag/fall/window-move/jump), and lightweight window polling.",
+    "Window Riding & Boundary Ejection: Characters standing on or climbing an application window move together with that window when it is dragged. If the character's bounding box would exceed screen bounds or fall off the visible window, the character detaches and enters free-fall (FALL)."
+  ],
+  "resourceOptimizationPolicy": {
+    "activeFrameRate": 60,
+    "normalFrameRate": 30,
+    "idleFrameRate": 15,
+    "windowPollIntervalSeconds": 0.08,
+    "useDirtyRectInvalidation": true,
+    "sleepOnScreenLock": true,
+    "maxConcurrentCharacters": 4,
+    "allowDuplicateCharacters": false
+  },
+  "platformAbstractions": {
+    "OverlayWindow": {
+      "role": "Full-screen transparent always-on-top window that renders characters with dirty-rect invalidation and dynamically toggles mouse click-through.",
+      "properties": {
+        "isTransparent": true,
+        "hasShadow": false,
+        "alwaysOnTop": true,
+        "coversFullScreen": true
+      },
+      "methods": [
+        {
+          "name": "setClickThrough",
+          "parameters": ["ignoreMouseEvents: Bool"],
+          "description": "When true, mouse clicks pass through to underlying OS windows. When false (cursor is over a character hitbox), the overlay captures mouse events."
+        }
+      ],
+      "platformMappings": {
+        "macOS": "NSWindow (styleMask: .borderless, level: .floating, backgroundColor: .clear, ignoresMouseEvents)",
+        "windows": "HWND with WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT (toggled via SetWindowLong)"
+      }
+    },
+    "WindowTracker": {
+      "role": "Queries the OS window manager for visible application windows, tracks window IDs, top edges (PlatformSegment), and left/right vertical side edges (bottomY..topY) so characters can jump onto low ledges or climb up the sides of windows.",
+      "methods": [
+        {
+          "name": "pollPlatforms",
+          "returns": "Array<PlatformSegment>",
+          "description": "Returns the floor segment (dock/taskbar top) plus visible top edges and vertical side bounds of active standard application windows."
+        }
+      ],
+      "platformMappings": {
+        "macOS": "CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) + NSScreen.main.visibleFrame",
+        "windows": "EnumWindows + GetWindowRect + DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS) + SystemParametersInfo(SPI_GETWORKAREA)"
+      }
+    },
+    "SystemTrayController": {
+      "role": "Provides a menu bar / system tray icon AND right-click context menu on characters to toggle each of the 4 unique characters between Summoned (active on desktop) and Resting (removed), with no duplicate characters allowed. Menu item label shows '<displayName> 소환' when resting and '<displayName> 휴식' when active.",
+      "menuActions": [
+        { "id": "toggle_character_chiikawa", "label": "치이카와 (Chiikawa) 소환 / 휴식" },
+        { "id": "toggle_character_hachiware", "label": "하치와레 (Hachiware) 소환 / 휴식" },
+        { "id": "toggle_character_usagi", "label": "우사기 (Usagi) 소환 / 휴식" },
+        { "id": "toggle_character_momonga", "label": "모몽가 (Momonga) 소환 / 휴식" },
+        { "id": "toggle_wandering", "label": "자율 돌아다니기 토글 (Toggle Wandering)" },
+        { "id": "scale_small", "label": "크기: 작게 (Small 0.75x)" },
+        { "id": "scale_normal", "label": "크기: 보통 (Normal 1.0x)" },
+        { "id": "scale_large", "label": "크기: 크게 (Large 1.35x)" },
+        { "id": "reset_positions", "label": "모두 위로 부르기 (Reset Positions)" },
+        { "id": "quit_app", "label": "종료 (Quit)" }
+      ]
+    }
+  },
+  "coreModules": [
+    {
+      "name": "SpecLoader",
+      "file": "SpecLoader",
+      "responsibility": "Loads and parses spec/architecture.json, spec/physics_and_world.json, and spec/character_fsm.json at startup."
+    },
+    {
+      "name": "SpriteAssetRepository",
+      "file": "SpriteAssetRepository",
+      "responsibility": "Scans assets/<character_id>/<state_folder>/*.png at startup, caches CGImage frame sequences in memory for low-CPU rendering, and falls back to existing state sprites or procedural vector rendering if a folder is empty."
+    },
+    {
+      "name": "WindowTracker",
+      "file": "WindowTracker",
+      "responsibility": "Polls OS window geometry and produces normalized PlatformSegment objects with windowID, rawWindowMinX/MaxX, and windowBottomY for delta tracking, step-jump detection, and side-edge climbing."
+    },
+    {
+      "name": "PhysicsWorld",
+      "file": "PhysicsWorld",
+      "responsibility": "Applies gravity, velocity, window-riding position synchronization, screen/window boundary ejection checks, small-ledge jump target detection, and window side-edge climb detection."
+    },
+    {
+      "name": "CharacterEntity",
+      "file": "CharacterEntity",
+      "responsibility": "Executes the Finite State Machine (character_fsm.json), rides moving windows, jumps up small ledges (<= 0.5x character height), climbs up window left/right edges with height-based rest pauses, and handles mouse interactions."
+    },
+    {
+      "name": "OverlayView",
+      "file": "OverlayView",
+      "responsibility": "Runs the adaptive update loop (30/60 FPS), invalidates only dirty rectangles around characters, performs cursor hit-testing, forwards mouse events, and renders characters."
+    }
+  ],
+  "dataModels": {
+    "PlatformSegment": {
+      "fields": {
+        "id": "String (segment identifier)",
+        "windowID": "Int (OS window handle / CGWindowID, 0 for floor)",
+        "ownerName": "String (application name)",
+        "rawWindowMinX": "Double (unclipped left X of the OS window)",
+        "rawWindowMaxX": "Double (unclipped right X of the OS window)",
+        "windowBottomY": "Double (normalized bottom-up Y coordinate of the bottom of the window)",
+        "minX": "Double (visible walkable left X)",
+        "maxX": "Double (visible walkable right X)",
+        "y": "Double (normalized bottom-up Y coordinate of the top surface)",
+        "isFloor": "Bool"
+      }
+    }
+  },
+  "characterAssetSpecification": {
+    "supportedFormats": [
+      "Sprite Sheet (Single PNG per character or per state + JSON frame metadata)",
+      "Frame Sequence (Folder of numbered PNGs per state: e.g., assets/chiikawa/walk/0.png, 1.png...)"
+    ],
+    "recommendedCanvasSizePx": {
+      "standard": "256x256 (Retina 2x/3x downscaled to 84x84 pt)",
+      "pixelArt": "128x128 (Nearest-neighbor crisp scaling)"
+    },
+    "colorSpaceAndTransparency": "RGBA 32-bit PNG with transparent background (alpha channel)",
+    "pivotPoint": "Bottom-Center (x: 0.5, y: 0.0 — character's feet touch y=0 of the canvas so it stands flush on window tops)",
+    "requiredAnimations": [
+      { "state": "IDLE", "folder": "idle", "recommendedFrames": "2~4 frames (loop)", "fps": 6, "description": "Breathing / blinking standing pose" },
+      { "state": "WALK", "folder": "walk", "recommendedFrames": "4~6 frames (loop)", "fps": 10, "description": "Walking left-to-right" },
+      { "state": "JUMP_STEP", "folder": "jump", "recommendedFrames": "2~4 frames (once/loop)", "fps": 10, "description": "Hopping up onto a small ledge (falls back to walk/idle with hop arc if folder is empty)" },
+      { "state": "CLIMB_WALL", "folder": "climb", "recommendedFrames": "2~4 frames (loop)", "fps": 9, "description": "Climbing up the left or right vertical edge of a window (falls back to walk with climbing tilt if folder is empty)" },
+      { "state": "CLIMB_REST", "folder": "climb_rest", "recommendedFrames": "2~4 frames (loop)", "fps": 6, "description": "Clinging to the window side edge catching breath mid-climb on tall windows (falls back to idle/cry with sweat drops if folder is empty)" },
+      { "state": "CRY_CLICK", "folder": "cry_click", "recommendedFrames": "2~5 frames (loop)", "fps": 10, "description": "Crying in place when clicked" },
+      { "state": "DRAGGED_STRUGGLE", "folder": "dragged_struggle", "recommendedFrames": "4~6 frames (loop)", "fps": 14, "description": "Hanging from cursor, crying and flailing arms/legs" },
+      { "state": "FALL", "folder": "fall", "recommendedFrames": "2 frames (loop)", "fps": 8, "description": "Airborne falling pose" },
+      { "state": "TUMBLE", "folder": "tumble", "recommendedFrames": "3~5 frames (once)", "fps": 8, "description": "Falling over flat on impact and getting back up" }
+    ]
+  }
+}

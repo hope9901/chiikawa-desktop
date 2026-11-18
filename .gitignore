@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Build artifacts & binaries
+.build/
+/ChiikawaDesktop
+/ChiikawaDesktop.app/
+*.dSYM/
+
+# Backup raw sprite sheets (optional, keep sliced frames in assets/)
+assets/*/_source_sheets/
