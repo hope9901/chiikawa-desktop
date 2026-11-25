@@ -47,7 +47,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     }
 
     private func setupOverlayWindow() {
-        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let screenFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 
         overlayWindow = NSWindow(
             contentRect: screenFrame,
@@ -122,23 +122,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         wanderItem.target = self
         menu.addItem(wanderItem)
 
-        // Size submenu
-        let sizeMenu = NSMenu(title: "크기 조절")
-        let scales: [(String, Double)] = [
-            ("작게 (Small 0.75x)", specBundle.physicsAndWorld.characterDimensions.availableScales["small"] ?? 0.75),
-            ("보통 (Normal 1.0x)", specBundle.physicsAndWorld.characterDimensions.availableScales["normal"] ?? 1.0),
-            ("크게 (Large 1.35x)", specBundle.physicsAndWorld.characterDimensions.availableScales["large"] ?? 1.35)
-        ]
-        for (label, value) in scales {
-            let sItem = NSMenuItem(title: label, action: #selector(menuSelectScale(_:)), keyEquivalent: "")
-            sItem.representedObject = value
-            sItem.target = self
-            sItem.state = abs(overlayView.currentScale - value) < 0.05 ? .on : .off
-            sizeMenu.addItem(sItem)
-        }
-        let sizeParent = NSMenuItem(title: "캐릭터 크기 (Size)", action: nil, keyEquivalent: "")
-        sizeParent.submenu = sizeMenu
-        menu.addItem(sizeParent)
+        menu.addItem(.separator())
+        menu.addItem(overlayView.makeScaleSliderMenuItem())
+        menu.addItem(.separator())
 
         let resetItem = NSMenuItem(
             title: "모두 위로 부르기 (Reset Positions)",
@@ -147,6 +133,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         )
         resetItem.target = self
         menu.addItem(resetItem)
+
+        let loginItem = NSMenuItem(
+            title: "시작프로그램 등록 (로그인 시 자동 실행)",
+            action: #selector(menuToggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        loginItem.state = LaunchAtLoginManager.shared.isEnabled ? .on : .off
+        loginItem.target = self
+        menu.addItem(loginItem)
 
         menu.addItem(.separator())
 
@@ -173,6 +168,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
+            _ = self.windowTracker.pollPlatforms(force: true)
+        }
+
+        // Resize overlay window if monitor resolution or Dock geometry changes
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, let screenFrame = NSScreen.screens.first?.frame else { return }
+            self.overlayWindow.setFrame(screenFrame, display: true)
+            self.overlayView.frame = NSRect(origin: .zero, size: screenFrame.size)
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 
@@ -242,6 +249,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         overlayViewRequestResetPositions()
     }
 
+    @objc private func menuToggleLaunchAtLogin() {
+        overlayViewRequestToggleLaunchAtLogin()
+    }
+
     @objc private func menuQuit() {
         overlayViewRequestQuit()
     }
@@ -258,11 +269,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
 
     public func overlayViewRequestSetScale(_ scale: Double) {
         overlayView.setScaleForAll(scale)
-        rebuildStatusBarMenu()
     }
 
     public func overlayViewRequestResetPositions() {
         overlayView.resetAllPositions()
+    }
+
+    public func overlayViewRequestToggleLaunchAtLogin() {
+        _ = LaunchAtLoginManager.shared.toggle()
+        rebuildStatusBarMenu()
     }
 
     public func overlayViewRequestQuit() {

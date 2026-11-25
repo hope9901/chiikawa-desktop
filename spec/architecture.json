@@ -37,7 +37,7 @@
       ],
       "platformMappings": {
         "macOS": "NSWindow (styleMask: .borderless, level: .floating, backgroundColor: .clear, ignoresMouseEvents)",
-        "windows": "HWND with WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT (toggled via SetWindowLong)"
+        "windows": "Win32 / .NET 8 WPF Window (WindowStyle.None, AllowsTransparency=true, Topmost=true, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW toggled dynamically via SetWindowLongPtr)"
       }
     },
     "WindowTracker": {
@@ -50,24 +50,27 @@
         }
       ],
       "platformMappings": {
-        "macOS": "CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) + NSScreen.main.visibleFrame",
-        "windows": "EnumWindows + GetWindowRect + DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS) + SystemParametersInfo(SPI_GETWORKAREA)"
+        "macOS": "CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) + NSScreen.screens.first.visibleFrame",
+        "windows": "EnumWindows + IsWindowVisible + IsIconic + DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS / DWMWA_CLOAKED) + SystemParametersInfo(SPI_GETWORKAREA)"
       }
     },
     "SystemTrayController": {
-      "role": "Provides a menu bar / system tray icon AND right-click context menu on characters to toggle each of the 4 unique characters between Summoned (active on desktop) and Resting (removed), with no duplicate characters allowed. Menu item label shows '<displayName> 소환' when resting and '<displayName> 휴식' when active.",
+      "role": "Provides a menu bar / system tray icon AND right-click context menu on characters to toggle each of the 4 unique characters between Summoned (active on desktop) and Resting (removed), adjust character scale continuously via an interactive NSSlider (minScale 0.50x to maxScale 1.35x), toggle wandering, toggle auto-start on OS login (Launch at Login), reset positions, or quit.",
       "menuActions": [
         { "id": "toggle_character_chiikawa", "label": "치이카와 (Chiikawa) 소환 / 휴식" },
         { "id": "toggle_character_hachiware", "label": "하치와레 (Hachiware) 소환 / 휴식" },
         { "id": "toggle_character_usagi", "label": "우사기 (Usagi) 소환 / 휴식" },
         { "id": "toggle_character_momonga", "label": "모몽가 (Momonga) 소환 / 휴식" },
         { "id": "toggle_wandering", "label": "자율 돌아다니기 토글 (Toggle Wandering)" },
-        { "id": "scale_small", "label": "크기: 작게 (Small 0.75x)" },
-        { "id": "scale_normal", "label": "크기: 보통 (Normal 1.0x)" },
-        { "id": "scale_large", "label": "크기: 크게 (Large 1.35x)" },
+        { "id": "scale_slider", "label": "캐릭터 크기 슬라이더 (Scale Slider: 0.50x ~ 1.35x)" },
+        { "id": "toggle_launch_at_login", "label": "시작프로그램 등록 / 로그인 시 자동 실행 (Launch at Login)" },
         { "id": "reset_positions", "label": "모두 위로 부르기 (Reset Positions)" },
         { "id": "quit_app", "label": "종료 (Quit)" }
-      ]
+      ],
+      "platformMappings": {
+        "macOS": "NSStatusBar + NSMenu + LaunchAgent plist (~/Library/LaunchAgents/com.chiikawa.desktop.plist)",
+        "windows": "System.Windows.Forms.NotifyIcon + WPF ContextMenu + Registry (HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run)"
+      }
     }
   },
   "coreModules": [
@@ -80,6 +83,16 @@
       "name": "SpriteAssetRepository",
       "file": "SpriteAssetRepository",
       "responsibility": "Scans assets/<character_id>/<state_folder>/*.png at startup, caches CGImage frame sequences in memory for low-CPU rendering, and falls back to existing state sprites or procedural vector rendering if a folder is empty."
+    },
+    {
+      "name": "AudioAssetPlayer",
+      "file": "AudioAssetPlayer",
+      "responsibility": "Scans assets/<character_id>/audio/*.(mp3|wav|m4a) and plays character songs when characters with playsSongOnClick=true (Hachiware, Usagi) are single-clicked, stopping playback if the character is dragged or removed."
+    },
+    {
+      "name": "LaunchAtLoginManager",
+      "file": "LaunchAtLoginManager",
+      "responsibility": "Manages OS auto-start registration (macOS LaunchAgents plist / Windows HKCU Run registry key) so the desktop characters automatically appear when the computer boots."
     },
     {
       "name": "WindowTracker",
@@ -135,7 +148,7 @@
       { "state": "JUMP_STEP", "folder": "jump", "recommendedFrames": "2~4 frames (once/loop)", "fps": 10, "description": "Hopping up onto a small ledge (falls back to walk/idle with hop arc if folder is empty)" },
       { "state": "CLIMB_WALL", "folder": "climb", "recommendedFrames": "2~4 frames (loop)", "fps": 9, "description": "Climbing up the left or right vertical edge of a window (falls back to walk with climbing tilt if folder is empty)" },
       { "state": "CLIMB_REST", "folder": "climb_rest", "recommendedFrames": "2~4 frames (loop)", "fps": 6, "description": "Clinging to the window side edge catching breath mid-climb on tall windows (falls back to idle/cry with sweat drops if folder is empty)" },
-      { "state": "CRY_CLICK", "folder": "cry_click", "recommendedFrames": "2~5 frames (loop)", "fps": 10, "description": "Crying in place when clicked" },
+      { "state": "CRY_CLICK", "folder": "cry_click", "recommendedFrames": "2~5 frames (loop)", "fps": 10, "description": "Triggered on single click: crying in place (Chiikawa/Momonga) or singing motion while audio plays from assets/<id>/audio/ (Hachiware/Usagi)" },
       { "state": "DRAGGED_STRUGGLE", "folder": "dragged_struggle", "recommendedFrames": "4~6 frames (loop)", "fps": 14, "description": "Hanging from cursor, crying and flailing arms/legs" },
       { "state": "FALL", "folder": "fall", "recommendedFrames": "2 frames (loop)", "fps": 8, "description": "Airborne falling pose" },
       { "state": "TUMBLE", "folder": "tumble", "recommendedFrames": "3~5 frames (once)", "fps": 8, "description": "Falling over flat on impact and getting back up" }

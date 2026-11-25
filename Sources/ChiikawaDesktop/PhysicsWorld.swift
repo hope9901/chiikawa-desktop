@@ -17,16 +17,16 @@ public final class PhysicsWorld {
         self.dimensions = spec.characterDimensions
     }
 
-    /// Returns the usable screen area (excluding Dock and top Menu Bar) in bottom-left coordinates.
+    /// Returns the usable screen area (excluding Dock and top Menu Bar) on the primary overlay monitor in bottom-left coordinates.
     public var usableScreenBounds: CGRect {
-        guard let screen = NSScreen.main else {
+        guard let screen = NSScreen.screens.first else {
             return CGRect(x: 0, y: 0, width: 1440, height: 900)
         }
         let full = screen.frame
         let visible = screen.visibleFrame
         return CGRect(
             x: visible.minX - full.minX,
-            y: visible.minY - full.minY,
+            y: max(0.0, visible.minY - full.minY),
             width: visible.width,
             height: visible.height
         )

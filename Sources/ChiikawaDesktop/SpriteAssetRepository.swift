@@ -19,15 +19,16 @@ public final class SpriteAssetRepository {
     private static func resolveAssetsRoot(folderName: String) -> URL {
         let fm = FileManager.default
         let currentDir = URL(fileURLWithPath: fm.currentDirectoryPath)
+        let projectDirFromSource = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        // Prioritize live project assets/ directory before frozen .app bundle Resources
         let candidates: [URL] = [
-            currentDir.appendingPathComponent(folderName),
-            Bundle.main.resourceURL?.appendingPathComponent(folderName),
             Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(folderName),
-            URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent(folderName)
+            projectDirFromSource.appendingPathComponent(folderName),
+            currentDir.appendingPathComponent(folderName),
+            Bundle.main.resourceURL?.appendingPathComponent(folderName)
         ].compactMap { $0 }
 
         for dir in candidates {
@@ -93,8 +94,8 @@ public final class SpriteAssetRepository {
 
         let fps = fsmSpec.stateAnimationFPS[state.rawValue] ?? 8.0
         if state == .tumble {
-            // Play once clamped to last frame
-            let idx = min(validFrames.count - 1, Int(stateElapsed * fps))
+            let profileTumbleFPS = fsmSpec.defaultCharacters.first(where: { $0.id == characterID })?.tumbleFPS ?? fps
+            let idx = min(validFrames.count - 1, Int(stateElapsed * profileTumbleFPS))
             return validFrames[max(0, idx)]
         } else {
             let idx = Int(animPhase * fps) % validFrames.count

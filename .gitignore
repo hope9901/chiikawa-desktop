@@ -7,5 +7,8 @@
 /ChiikawaDesktop.app/
 *.dSYM/
 
-# Backup raw sprite sheets (optional, keep sliced frames in assets/)
+# Backup raw sprite sheets & intermediate sprite-gen folders
 assets/*/_source_sheets/
+assets/*/_sprite_gen/
+assets/*/base.png
+*-backup-*.zip

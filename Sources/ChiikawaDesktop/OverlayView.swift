@@ -4,6 +4,7 @@ import CoreGraphics
 public protocol OverlayViewDelegate: AnyObject {
     func overlayViewRequestToggleCharacter(characterID: String)
     func overlayViewRequestToggleWandering()
+    func overlayViewRequestToggleLaunchAtLogin()
     func overlayViewRequestSetScale(_ scale: Double)
     func overlayViewRequestResetPositions()
     func overlayViewRequestQuit()
@@ -81,6 +82,7 @@ public final class OverlayView: NSView {
     }
 
     public func removeCharacter(id: String) {
+        AudioAssetPlayer.shared.stopSong(for: id)
         let targets = characters.filter { $0.profile.id == id }
         for target in targets {
             let oldRect = target.dirtyRect
@@ -243,6 +245,8 @@ public final class OverlayView: NSView {
         wanderItem.target = self
         menu.addItem(wanderItem)
 
+        menu.addItem(makeScaleSliderMenuItem())
+
         menu.addItem(.separator())
 
         let restSelfItem = NSMenuItem(
@@ -273,6 +277,17 @@ public final class OverlayView: NSView {
 
         menu.addItem(.separator())
 
+        let loginItem = NSMenuItem(
+            title: "시작프로그램 등록 (로그인 시 자동 실행)",
+            action: #selector(contextToggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        loginItem.state = LaunchAtLoginManager.shared.isEnabled ? .on : .off
+        loginItem.target = self
+        menu.addItem(loginItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "종료 (Quit)", action: #selector(contextQuit), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -282,6 +297,71 @@ public final class OverlayView: NSView {
 
     @objc private func contextToggleWandering() {
         delegate?.overlayViewRequestToggleWandering()
+    }
+
+    public func makeScaleSliderMenuItem() -> NSMenuItem {
+        let range = specBundle.physicsAndWorld.characterDimensions.scaleRange
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 54))
+
+        let titleLabel = NSTextField(labelWithString: formatScaleLabel(currentScale, range: range))
+        titleLabel.font = NSFont.menuFont(ofSize: 12)
+        titleLabel.textColor = NSColor.labelColor
+        titleLabel.frame = NSRect(x: 18, y: 30, width: 184, height: 18)
+        titleLabel.identifier = NSUserInterfaceItemIdentifier("scaleTitleLabel")
+        container.addSubview(titleLabel)
+
+        let slider = NSSlider(
+            value: currentScale,
+            minValue: range.min,
+            maxValue: range.max,
+            target: self,
+            action: #selector(scaleSliderChanged(_:))
+        )
+        slider.isContinuous = true
+        slider.numberOfTickMarks = range.numberOfTickMarks
+        slider.allowsTickMarkValuesOnly = false
+        slider.tickMarkPosition = .below
+        slider.frame = NSRect(x: 18, y: 4, width: 184, height: 24)
+        container.addSubview(slider)
+
+        let item = NSMenuItem()
+        item.view = container
+        return item
+    }
+
+    private func formatScaleLabel(_ scale: Double, range: PhysicsAndWorldSpec.CharacterDimensionsSpec.ScaleRangeSpec) -> String {
+        let span = range.max - range.min
+        let fraction = span > 0 ? (scale - range.min) / span : 0
+        for (idx, detent) in range.detentFractions.enumerated() {
+            if abs(fraction - detent) < 0.005 {
+                return String(format: "캐릭터 크기: %.0f%% (%d/4 턱)", scale * 100.0, idx + 1)
+            }
+        }
+        return String(format: "캐릭터 크기: %.0f%% (%.2fx)", scale * 100.0, scale)
+    }
+
+    @objc private func scaleSliderChanged(_ sender: NSSlider) {
+        let range = specBundle.physicsAndWorld.characterDimensions.scaleRange
+        let span = range.max - range.min
+        var rawValue = sender.doubleValue
+
+        if span > 0 {
+            let fraction = (rawValue - range.min) / span
+            // Magnetic snap (detent) near 1/4, 2/4, 3/4 positions
+            for detent in range.detentFractions {
+                if abs(fraction - detent) <= range.detentSnapRadiusFraction {
+                    rawValue = range.min + detent * span
+                    sender.doubleValue = rawValue
+                    break
+                }
+            }
+        }
+
+        if let container = sender.superview,
+           let label = container.subviews.first(where: { $0.identifier?.rawValue == "scaleTitleLabel" }) as? NSTextField {
+            label.stringValue = formatScaleLabel(rawValue, range: range)
+        }
+        delegate?.overlayViewRequestSetScale(rawValue)
     }
 
     @objc private func contextRestClickedCharacter() {
@@ -294,6 +374,10 @@ public final class OverlayView: NSView {
         if let id = sender.representedObject as? String {
             delegate?.overlayViewRequestToggleCharacter(characterID: id)
         }
+    }
+
+    @objc private func contextToggleLaunchAtLogin() {
+        delegate?.overlayViewRequestToggleLaunchAtLogin()
     }
 
     @objc private func contextQuit() {
@@ -403,7 +487,10 @@ public final class OverlayView: NSView {
                 ctx.rotate(by: tiltAngle)
             }
             ctx.scaleBy(x: squashX * (char.facingRight ? 1.0 : -1.0), y: squashY)
-            let spriteRect = CGRect(x: -w * 0.5, y: 0, width: w, height: h)
+            let renderScale = CGFloat(char.spriteRenderScale)
+            let spriteWidth = w * renderScale
+            let spriteHeight = h * renderScale * CGFloat(customSprite.height) / CGFloat(customSprite.width)
+            let spriteRect = CGRect(x: -spriteWidth * 0.5, y: 0, width: spriteWidth, height: spriteHeight)
             ctx.interpolationQuality = .high
             ctx.draw(customSprite, in: spriteRect)
 
@@ -412,13 +499,13 @@ public final class OverlayView: NSView {
                 let sweatColor = NSColor(calibratedRed: 0.40, green: 0.78, blue: 1.0, alpha: 0.90)
                 ctx.setFillColor(sweatColor.cgColor)
                 let dropOffset = (phase * 18.0).truncatingRemainder(dividingBy: 10.0)
-                ctx.fillEllipse(in: CGRect(x: w * 0.28, y: h * 0.62 - dropOffset, width: 6.5, height: 9.5))
-                ctx.fillEllipse(in: CGRect(x: -w * 0.34, y: h * 0.56 - dropOffset * 0.7, width: 5.5, height: 8.5))
+                ctx.fillEllipse(in: CGRect(x: spriteWidth * 0.28, y: h * renderScale * 0.62 - dropOffset, width: 6.5, height: 9.5))
+                ctx.fillEllipse(in: CGRect(x: -spriteWidth * 0.34, y: h * renderScale * 0.56 - dropOffset * 0.7, width: 5.5, height: 8.5))
             }
             ctx.restoreGState()
 
             if let text = char.activeSpeechText {
-                drawSpeechBubble(text: text, centerX: centerX, topY: baseY + h + 4.0, in: ctx)
+                drawSpeechBubble(text: text, centerX: centerX, topY: baseY + spriteHeight + 4.0, in: ctx)
             }
             ctx.restoreGState()
             return

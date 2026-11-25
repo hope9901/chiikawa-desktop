@@ -39,25 +39,32 @@ public final class WindowTracker {
         }
         lastPollTimestamp = now
 
-        guard let screen = NSScreen.main else { return cachedPlatforms }
-        let fullFrame = screen.frame
-        let visibleFrame = screen.visibleFrame
+        // IMPORTANT: In multi-monitor setups, NSScreen.main changes whenever focus moves to a second monitor!
+        // CGWindowListCopyWindowInfo ALWAYS uses the Primary Screen (NSScreen.screens.first) top-left origin.
+        // Therefore, we must ALWAYS use NSScreen.screens.first so coordinates never shift or push characters underground.
+        guard let primaryScreen = NSScreen.screens.first else { return cachedPlatforms }
+        let fullFrame = primaryScreen.frame
+        let visibleFrame = primaryScreen.visibleFrame
         let screenHeight = Double(fullFrame.height)
+        let screenMinX = Double(fullFrame.minX)
+        let screenMaxX = Double(fullFrame.maxX)
 
         var segments: [PlatformSegment] = []
 
-        // 1. Add the desktop floor (top of Dock / bottom of visible screen)
-        let floorY = Double(visibleFrame.minY - fullFrame.minY)
+        // 1. Add the desktop floor (top of Dock / bottom of visible screen on the primary monitor)
+        let floorY = max(0.0, Double(visibleFrame.minY - fullFrame.minY))
+        let floorMinX = Double(visibleFrame.minX - fullFrame.minX)
+        let floorMaxX = Double(visibleFrame.maxX - fullFrame.minX)
         let floorSegment = PlatformSegment(
             id: "floor",
             windowID: 0,
             ownerName: "Desktop Floor",
-            rawWindowMinX: Double(visibleFrame.minX),
-            rawWindowMaxX: Double(visibleFrame.maxX),
-            windowBottomY: max(0.0, floorY),
-            minX: Double(visibleFrame.minX),
-            maxX: Double(visibleFrame.maxX),
-            y: max(0.0, floorY),
+            rawWindowMinX: floorMinX,
+            rawWindowMaxX: floorMaxX,
+            windowBottomY: floorY,
+            minX: floorMinX,
+            maxX: floorMaxX,
+            y: floorY,
             isFloor: true
         )
         segments.append(floorSegment)
@@ -98,15 +105,25 @@ public final class WindowTracker {
                 continue
             }
 
-            // CGWindowBounds uses top-left origin: cgY is distance from top of screen to top of window.
+            // Reject windows that have been moved completely onto another monitor (outside primary screen bounds)
+            if (cgX + cgW) <= screenMinX || cgX >= screenMaxX || (cgY + cgH) <= 0.0 || cgY >= screenHeight {
+                continue
+            }
+
+            // CGWindowBounds uses primary screen top-left origin: cgY is distance from top of primary screen.
             let topEdgeY = screenHeight - cgY
             let bottomEdgeY = screenHeight - (cgY + cgH)
-            let rawMinX = cgX
-            let rawMaxX = cgX + cgW
-            let minX = max(Double(visibleFrame.minX), rawMinX)
-            let maxX = min(Double(visibleFrame.maxX), rawMaxX)
+            let rawMinX = cgX - screenMinX
+            let rawMaxX = rawMinX + cgW
+            let minX = max(floorMinX, rawMinX)
+            let maxX = min(floorMaxX, rawMaxX)
 
             guard maxX - minX >= 48.0 else {
+                continue
+            }
+
+            // Also ensure the window top edge lies within the primary monitor's vertical visible range
+            guard topEdgeY >= floorSegment.y + 16.0 && topEdgeY <= Double(visibleFrame.maxY - fullFrame.minY) else {
                 continue
             }
 
@@ -118,7 +135,7 @@ public final class WindowTracker {
             )
 
             let clearanceFromTop = cgY
-            if clearanceFromTop >= rules.minTopClearanceFromScreenTop && topEdgeY > floorSegment.y + 16.0 {
+            if clearanceFromTop >= rules.minTopClearanceFromScreenTop {
                 let winNumber = (info[kCGWindowNumber as String] as? Int) ?? 0
                 let baseSegment = PlatformSegment(
                     id: "win_\(winNumber)",

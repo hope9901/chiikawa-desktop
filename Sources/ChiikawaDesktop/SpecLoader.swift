@@ -51,6 +51,7 @@ public struct PhysicsAndWorldSpec: Codable {
         public let enableWindowEdgeClimb: Bool
         public let climbTriggerDistanceX: Double
         public let climbProbability: Double
+        public let decisionCooldownSeconds: Double
         public let climbSpeed: Double
         public let minClimbHeightForRestRatio: Double
         public let climbRestSegmentDistanceRatio: Double
@@ -63,6 +64,8 @@ public struct PhysicsAndWorldSpec: Codable {
         public let freeFallWhenOutOfScreenBounds: Bool
         public let freeFallWhenCharacterExceedsWindowEdge: Bool
         public let requireFullCharacterBodyInsideScreen: Bool
+        public let pinToPrimaryScreenInMultiMonitor: Bool
+        public let hardFloorClampEnabled: Bool
         public let description: String
     }
 
@@ -72,7 +75,17 @@ public struct PhysicsAndWorldSpec: Codable {
         public let hitboxPadding: Double
         public let grabAnchorOffsetY: Double
         public let dirtyRectMargin: Double
+        public let scaleRange: ScaleRangeSpec
         public let availableScales: [String: Double]
+
+        public struct ScaleRangeSpec: Codable {
+            public let min: Double
+            public let `default`: Double
+            public let max: Double
+            public let detentFractions: [Double]
+            public let detentSnapRadiusFraction: Double
+            public let numberOfTickMarks: Int
+        }
     }
 
     public struct WindowDetectionRulesSpec: Codable {
@@ -103,15 +116,23 @@ public struct CharacterFSMSpec: Codable {
         public let id: String
         public let displayName: String
         public let assetFolder: String
+        public let audioFolder: String
+        public let playsSongOnClick: Bool
+        public let clickSpeech: String
         public let primaryColorHex: String
         public let accentColorHex: String
         public let earStyle: String
+        public let heightMultiplier: Double
+        public let canRestDuringClimb: Bool
+        public let tumbleDurationSeconds: Double
+        public let tumbleFPS: Double
         public let catchphrases: [String]
     }
 
     public struct InteractionTimingsSpec: Codable {
         public let holdThresholdSeconds: Double
         public let clickCryDurationSeconds: Double
+        public let playFullSongOnClick: Bool
         public let tumbleDurationSeconds: Double
         public let speechBubbleDurationSeconds: Double
         public let idleMinDurationSeconds: Double
@@ -180,15 +201,15 @@ public final class SpecBundle {
     public static func loadDefault() throws -> SpecBundle {
         let fileManager = FileManager.default
         let currentDir = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        let projectDirFromSource = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let candidateDirs: [URL] = [
-            currentDir.appendingPathComponent("spec"),
-            Bundle.main.resourceURL?.appendingPathComponent("spec"),
             Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("spec"),
-            URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("spec")
+            projectDirFromSource.appendingPathComponent("spec"),
+            currentDir.appendingPathComponent("spec"),
+            Bundle.main.resourceURL?.appendingPathComponent("spec")
         ].compactMap { $0 }
 
         for dir in candidateDirs {

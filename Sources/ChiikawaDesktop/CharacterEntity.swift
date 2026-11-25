@@ -46,6 +46,8 @@ public final class CharacterEntity {
     private var climbDistanceSinceRest: Double = 0.0
     private var climbTotalHeight: Double = 0.0
     private var climbActionCooldown: Double = 0.0
+    // Per-window decision memory so a character doesn't re-roll every frame and tracks declined windows
+    private var ignoredWindowCooldowns: [Int: Double] = [:]
 
     // Mouse interaction tracking
     public private(set) var isMousePressed: Bool = false
@@ -87,19 +89,28 @@ public final class CharacterEntity {
         physics.dimensions.height * scaleFactor
     }
 
+    var spriteRenderScale: Double {
+        // Momonga's tail takes up part of the sprite cell, so the unscaled head reads smaller.
+        profile.id == "momonga" ? 1.16 : 1.0
+    }
+
+    private var spriteBoundsHeight: Double {
+        height * profile.heightMultiplier
+    }
+
     /// Bounding box in bottom-left screen coordinates for hit-testing
     public var hitboxRect: CGRect {
         let pad = physics.dimensions.hitboxPadding
-        let w = width + pad * 2.0
-        let h = height + pad * 2.0
+        let w = width * spriteRenderScale + pad * 2.0
+        let h = spriteBoundsHeight * spriteRenderScale + pad * 2.0
         return CGRect(x: x - w * 0.5, y: y - pad, width: w, height: h)
     }
 
     /// Expanded bounding box including speech bubble / tears / flailing limbs for dirty-rect redrawing
     public var dirtyRect: CGRect {
         let margin = physics.dimensions.dirtyRectMargin * max(1.0, scaleFactor)
-        let w = width + margin * 2.2
-        let h = height + margin * 2.4
+        let w = width * spriteRenderScale + margin * 2.2
+        let h = spriteBoundsHeight * spriteRenderScale + margin * 2.4
         return CGRect(x: x - w * 0.5, y: y - margin * 0.6, width: w, height: h)
     }
 
@@ -137,12 +148,30 @@ public final class CharacterEntity {
             climbActionCooldown -= dt
         }
 
+        if !ignoredWindowCooldowns.isEmpty {
+            for (winID, remaining) in ignoredWindowCooldowns {
+                let nextRemaining = remaining - dt
+                if nextRemaining <= 0 {
+                    ignoredWindowCooldowns.removeValue(forKey: winID)
+                } else {
+                    ignoredWindowCooldowns[winID] = nextRemaining
+                }
+            }
+        }
+
         let timings = fsmSpec.interactionTimings
         let usableBounds = physics.usableScreenBounds
         let halfW = width * 0.42
+        let effectiveH = spriteBoundsHeight
         let minScreenX = Double(usableBounds.minX) + halfW
         let maxScreenX = Double(usableBounds.maxX) - halfW
-        let maxScreenY = Double(usableBounds.maxY) - height * 0.92
+        let maxScreenY = Double(usableBounds.maxY) - effectiveH * 0.92
+        let floorY = max(0.0, platforms.first(where: { $0.isFloor })?.y ?? Double(usableBounds.minY))
+
+        // Hard safety guard: if y somehow dropped below floorY (e.g., monitor reconfiguration), snap back to floor
+        if physics.ridingRules.hardFloorClampEnabled && y < floorY - 2.0 && state != .fall && state != .fallFromGrab {
+            y = floorY
+        }
 
         switch state {
         case .idle:
@@ -161,7 +190,7 @@ public final class CharacterEntity {
                 currentPlatform = resolved.segment
             } else {
                 x = min(max(x, minScreenX), maxScreenX)
-                y = min(y, maxScreenY)
+                y = max(floorY, min(y, maxScreenY))
                 currentPlatform = nil
                 transition(to: .fall)
                 return
@@ -187,7 +216,7 @@ public final class CharacterEntity {
                 platforms: platforms
             ) else {
                 x = min(max(x, minScreenX), maxScreenX)
-                y = min(y, maxScreenY)
+                y = max(floorY, min(y, maxScreenY))
                 currentPlatform = nil
                 transition(to: .fall)
                 return
@@ -208,12 +237,14 @@ public final class CharacterEntity {
                    charHeight: height,
                    currentWindowID: support.windowID,
                    platforms: platforms
-               ) {
+               ),
+               ignoredWindowCooldowns[stepTarget.segment.windowID] == nil {
                 if Double.random(in: 0...1) < physics.jumpAndClimb.stepJumpProbability {
                     startStepJump(to: stepTarget.segment, landingX: stepTarget.landingX)
                     return
                 } else {
-                    climbActionCooldown = 1.2
+                    // Declined to jump onto this window -> ignore this window for decisionCooldownSeconds so character walks past it
+                    ignoredWindowCooldowns[stepTarget.segment.windowID] = physics.jumpAndClimb.decisionCooldownSeconds
                 }
             }
 
@@ -227,12 +258,14 @@ public final class CharacterEntity {
                    charHeight: height,
                    currentWindowID: support.windowID,
                    platforms: platforms
-               ) {
+               ),
+               ignoredWindowCooldowns[climbTarget.segment.windowID] == nil {
                 if Double.random(in: 0...1) < physics.jumpAndClimb.climbProbability {
                     startWindowClimb(target: climbTarget.segment, onLeftEdge: climbTarget.climbOnLeftEdge, edgeX: climbTarget.edgeX)
                     return
                 } else {
-                    climbActionCooldown = 1.8
+                    // Declined to climb this window -> ignore this window for decisionCooldownSeconds so character walks right past it
+                    ignoredWindowCooldowns[climbTarget.segment.windowID] = physics.jumpAndClimb.decisionCooldownSeconds
                 }
             }
 
@@ -324,6 +357,11 @@ public final class CharacterEntity {
             }
 
             let edgeX = climbingOnLeftEdge ? winSeg.rawWindowMinX : winSeg.rawWindowMaxX
+            // Synchronize with vertical window movement while climbing
+            if let prev = currentPlatform, prev.windowID == climbingWindowID {
+                y += (winSeg.y - prev.y)
+            }
+            currentPlatform = winSeg
             // Face toward the window while climbing
             facingRight = climbingOnLeftEdge
 
@@ -337,11 +375,11 @@ public final class CharacterEntity {
                 centerX: edgeX,
                 feetY: min(nextY, winSeg.y),
                 charWidth: width,
-                charHeight: height,
+                charHeight: effectiveH,
                 usableBounds: usableBounds
             ) {
                 x = min(max(edgeX, minScreenX), maxScreenX)
-                y = min(y, maxScreenY)
+                y = max(floorY, min(y, maxScreenY))
                 currentPlatform = nil
                 transition(to: .fall)
                 return
@@ -366,12 +404,13 @@ public final class CharacterEntity {
 
             y = nextY
 
-            // Check if the window is tall enough to trigger a mid-climb rest pause!
+            // Check if the window is tall enough to trigger a mid-climb rest pause (unless canRestDuringClimb is false, e.g., Usagi!)
             let minTotalForRest = height * physics.jumpAndClimb.minClimbHeightForRestRatio
             let restSegmentDist = height * physics.jumpAndClimb.climbRestSegmentDistanceRatio
             let remainingToTop = winSeg.y - y
 
-            if climbTotalHeight >= minTotalForRest &&
+            if profile.canRestDuringClimb &&
+               climbTotalHeight >= minTotalForRest &&
                climbDistanceSinceRest >= restSegmentDist &&
                remainingToTop > height * 0.45 {
                 climbDistanceSinceRest = 0.0
@@ -445,7 +484,8 @@ public final class CharacterEntity {
                     return
                 }
 
-                if stateElapsed >= timings.clickCryDurationSeconds {
+                if stateElapsed >= targetStateDuration {
+                    AudioAssetPlayer.shared.stopSong(for: profile.id)
                     transition(to: .idle)
                 }
             }
@@ -470,14 +510,14 @@ public final class CharacterEntity {
 
             if let landed = physics.findLandingPlatform(
                 centerX: nextX,
-                previousY: prevY,
+                previousY: max(prevY, floorY),
                 nextY: nextY,
                 charWidth: width,
                 charHeight: height,
                 platforms: platforms
             ) {
                 x = nextX
-                y = landed.y
+                y = max(floorY, landed.y)
                 vx = 0
                 vy = 0
                 currentPlatform = landed
@@ -485,7 +525,6 @@ public final class CharacterEntity {
                 return
             }
 
-            let floorY = platforms.first(where: { $0.isFloor })?.y ?? 0.0
             if nextY <= floorY {
                 x = nextX
                 y = floorY
@@ -515,13 +554,13 @@ public final class CharacterEntity {
                 currentPlatform = resolved.segment
             } else {
                 x = min(max(x, minScreenX), maxScreenX)
-                y = min(y, maxScreenY)
+                y = max(floorY, min(y, maxScreenY))
                 currentPlatform = nil
                 transition(to: .fall)
                 return
             }
 
-            if stateElapsed >= timings.tumbleDurationSeconds {
+            if stateElapsed >= targetStateDuration {
                 transition(to: .idle)
             }
         }
@@ -594,12 +633,21 @@ public final class CharacterEntity {
             vx = lastMouseVelocityX
             vy = -60.0
             transition(to: .fallFromGrab)
+        } else if state == .cryClick && profile.playsSongOnClick {
+            // Single click confirmed! Toggle full song playback (start if stopped, stop if already singing)
+            if let songDuration = AudioAssetPlayer.shared.toggleOrPlayClickSong(for: profile) {
+                targetStateDuration = stateElapsed + songDuration
+                showSpeech(profile.clickSpeech, duration: 4.0)
+            } else {
+                // Clicked again while singing -> stop song and return to IDLE
+                transition(to: .idle)
+            }
         }
     }
 
-    public func showSpeech(_ text: String) {
+    public func showSpeech(_ text: String, duration: Double? = nil) {
         activeSpeechText = text
-        speechTimer = fsmSpec.interactionTimings.speechBubbleDurationSeconds
+        speechTimer = duration ?? fsmSpec.interactionTimings.speechBubbleDurationSeconds
     }
 
     // MARK: - State Transitions
@@ -630,16 +678,18 @@ public final class CharacterEntity {
             showSpeech("헉헉.. 잠깐만 쉬자.. 💦")
         case .cryClick:
             targetStateDuration = timings.clickCryDurationSeconds
-            showSpeech("히익.. 훌쩍 ( ´•̥×•̥` )")
+            showSpeech(profile.clickSpeech)
         case .draggedStruggle:
+            AudioAssetPlayer.shared.stopSong(for: profile.id)
             showSpeech("으아아앙!! 놔줘~!! 💦")
         case .fall:
             climbingWindowID = 0
         case .fallFromGrab:
             climbingWindowID = 0
+            AudioAssetPlayer.shared.stopSong(for: profile.id)
             showSpeech("와아아앗~!!")
         case .tumble:
-            targetStateDuration = timings.tumbleDurationSeconds
+            targetStateDuration = profile.tumbleDurationSeconds
             showSpeech("철푸덕..! @~@")
         }
     }

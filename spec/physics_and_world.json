@@ -31,22 +31,25 @@
     "stepJumpHorizontalReach": 36.0,
     "stepJumpDurationSeconds": 0.38,
     "stepJumpArcPeakOffset": 22.0,
-    "stepJumpProbability": 0.85,
+    "stepJumpProbability": 0.45,
     "enableWindowEdgeClimb": true,
-    "climbTriggerDistanceX": 26.0,
-    "climbProbability": 0.70,
+    "climbTriggerDistanceX": 22.0,
+    "climbProbability": 0.38,
+    "decisionCooldownSeconds": 5.0,
     "climbSpeed": 54.0,
     "minClimbHeightForRestRatio": 1.6,
     "climbRestSegmentDistanceRatio": 1.35,
     "climbRestDurationSeconds": 1.25,
-    "description": "Characters walking near a higher platform within maxStepJumpHeightRatio (0.55x character height, ~46pt) hop up onto it (JUMP_STEP). Characters encountering the left or right vertical side edge of a taller window can grab the edge and climb up (CLIMB_WALL) to its top surface. If the climb height exceeds minClimbHeightForRestRatio * characterHeight, the character pauses midway (CLIMB_REST) to catch its breath before finishing the climb."
+    "description": "When a walking character encounters a low ledge or a window's vertical side edge, it rolls a single probability check per window encounter (stepJumpProbability = 0.45, climbProbability = 0.38). If the roll fails, that window is ignored for decisionCooldownSeconds so the character walks right past it instead of always climbing. Characters with canRestDuringClimb=false (e.g., Usagi) never pause in CLIMB_REST."
   },
   "windowRidingRules": {
     "followMovingWindow": true,
     "freeFallWhenOutOfScreenBounds": true,
     "freeFallWhenCharacterExceedsWindowEdge": true,
     "requireFullCharacterBodyInsideScreen": true,
-    "description": "When a character is standing on or climbing a window (windowID != 0), its position moves by the window's deltaX and deltaY. If moving the window pushes any part of the character's body (width or height) outside the screen's visibleFrame or off the window, the character detaches from the window and enters free-fall (FALL) clamped inside the screen."
+    "pinToPrimaryScreenInMultiMonitor": true,
+    "hardFloorClampEnabled": true,
+    "description": "All coordinates are pinned to the primary overlay screen (NSScreen.screens.first) rather than NSScreen.main (which shifts across monitors of different resolutions on focus change). Windows dragged onto secondary monitors are excluded once outside the primary screen bounds, detaching the character into free-fall onto the primary screen's floor (never falling below floorY)."
   },
   "characterDimensions": {
     "width": 84.0,
@@ -54,9 +57,17 @@
     "hitboxPadding": 6.0,
     "grabAnchorOffsetY": 56.0,
     "dirtyRectMargin": 48.0,
+    "scaleRange": {
+      "min": 0.50,
+      "default": 1.00,
+      "max": 1.35,
+      "detentFractions": [0.25, 0.50, 0.75],
+      "detentSnapRadiusFraction": 0.045,
+      "numberOfTickMarks": 5
+    },
     "availableScales": {
-      "small": 0.75,
-      "normal": 1.0,
+      "small": 0.50,
+      "normal": 1.00,
       "large": 1.35
     }
   },
