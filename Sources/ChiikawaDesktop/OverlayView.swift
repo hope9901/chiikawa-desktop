@@ -335,13 +335,11 @@ public final class OverlayView: NSView {
 
     private func formatScaleLabel(_ scale: Double, range: PhysicsAndWorldSpec.CharacterDimensionsSpec.ScaleRangeSpec) -> String {
         let span = range.max - range.min
-        let fraction = span > 0 ? (scale - range.min) / span : 0
-        for (idx, detent) in range.detentFractions.enumerated() {
-            if abs(fraction - detent) < 0.005 {
-                return String(format: "캐릭터 크기: %.0f%% (%d/4 턱)", scale * 100.0, idx + 1)
-            }
-        }
-        return String(format: "캐릭터 크기: %.0f%% (%.2fx)", scale * 100.0, scale)
+        let fraction = span > 0 ? max(0.0, min(1.0, (scale - range.min) / span)) : 0.5
+        let labels = range.tierLabels.count == 5 ? range.tierLabels : ["아주 작게", "작게", "보통", "크게", "아주 크게"]
+        // Map 0.0..1.0 to the nearest of the 5 tick positions (0.0, 0.25, 0.50, 0.75, 1.0)
+        let tierIndex = min(4, max(0, Int(round(fraction * 4.0))))
+        return "캐릭터 크기: \(labels[tierIndex])"
     }
 
     @objc private func scaleSliderChanged(_ sender: NSSlider) {

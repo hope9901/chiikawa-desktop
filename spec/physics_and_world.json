@@ -59,11 +59,12 @@
     "dirtyRectMargin": 48.0,
     "scaleRange": {
       "min": 0.50,
-      "default": 1.00,
+      "default": 0.925,
       "max": 1.35,
       "detentFractions": [0.25, 0.50, 0.75],
       "detentSnapRadiusFraction": 0.045,
-      "numberOfTickMarks": 5
+      "numberOfTickMarks": 5,
+      "tierLabels": ["아주 작게", "작게", "보통", "크게", "아주 크게"]
     },
     "availableScales": {
       "small": 0.50,

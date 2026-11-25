@@ -85,6 +85,7 @@ public struct PhysicsAndWorldSpec: Codable {
             public let detentFractions: [Double]
             public let detentSnapRadiusFraction: Double
             public let numberOfTickMarks: Int
+            public let tierLabels: [String]
         }
     }
 

@@ -316,12 +316,23 @@ public sealed class OverlayWindow : Window
         wanderItem.Click += (_, _) => WanderingEnabled = !WanderingEnabled;
         menu.Items.Add(wanderItem);
 
-        // Scale slider with 1/4, 2/4, 3/4 magnetic detents
+        // Scale slider with 1/4, 2/4, 3/4 magnetic detents and 5 tier labels
         var range = _specBundle.PhysicsAndWorld.CharacterDimensions.ScaleRange;
+        string FormatScaleTier(double val)
+        {
+            double span = range.Max - range.Min;
+            double frac = span > 0 ? Math.Clamp((val - range.Min) / span, 0.0, 1.0) : 0.5;
+            var labels = range.TierLabels.Count == 5
+                ? range.TierLabels
+                : new List<string> { "아주 작게", "작게", "보통", "크게", "아주 크게" };
+            int idx = Math.Clamp((int)Math.Round(frac * 4.0), 0, 4);
+            return $"캐릭터 크기: {labels[idx]}";
+        }
+
         var sliderPanel = new StackPanel { Width = 200, Margin = new Thickness(8, 4, 8, 4) };
         var sliderLabel = new TextBlock
         {
-            Text = $"캐릭터 크기: {CurrentScale * 100:0}% ({CurrentScale:0.00}x)",
+            Text = FormatScaleTier(CurrentScale),
             Margin = new Thickness(0, 0, 0, 4)
         };
         var slider = new Slider
@@ -338,7 +349,7 @@ public sealed class OverlayWindow : Window
             SetScaleForAll(args.NewValue);
             if (Math.Abs(slider.Value - CurrentScale) > 0.001)
                 slider.Value = CurrentScale;
-            sliderLabel.Text = $"캐릭터 크기: {CurrentScale * 100:0}% ({CurrentScale:0.00}x)";
+            sliderLabel.Text = FormatScaleTier(CurrentScale);
         };
         sliderPanel.Children.Add(sliderLabel);
         sliderPanel.Children.Add(slider);

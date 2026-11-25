@@ -106,11 +106,12 @@ public sealed class PhysicsAndWorldSpec
         public sealed class ScaleRangeSpec
         {
             [JsonPropertyName("min")] public double Min { get; set; } = 0.50;
-            [JsonPropertyName("default")] public double Default { get; set; } = 1.00;
+            [JsonPropertyName("default")] public double Default { get; set; } = 0.925;
             [JsonPropertyName("max")] public double Max { get; set; } = 1.35;
             [JsonPropertyName("detentFractions")] public List<double> DetentFractions { get; set; } = new() { 0.25, 0.50, 0.75 };
             [JsonPropertyName("detentSnapRadiusFraction")] public double DetentSnapRadiusFraction { get; set; } = 0.045;
             [JsonPropertyName("numberOfTickMarks")] public int NumberOfTickMarks { get; set; } = 5;
+            [JsonPropertyName("tierLabels")] public List<string> TierLabels { get; set; } = new() { "아주 작게", "작게", "보통", "크게", "아주 크게" };
         }
     }
 
