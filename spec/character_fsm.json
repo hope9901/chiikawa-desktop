@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.4.0",
+  "schemaVersion": "1.5.1",
   "initialState": "FALL",
   "maxCharacters": 4,
   "assetsRootDirectory": "assets",
@@ -29,24 +29,6 @@
   },
   "defaultCharacters": [
     {
-      "id": "chiikawa",
-      "displayName": "치이카와 (Chiikawa)",
-      "assetFolder": "assets/chiikawa",
-      "audioFolder": "assets/chiikawa/audio",
-      "playsSongOnClick": false,
-      "clickSpeech": "히익.. 훌쩍 ( ´•̥×•̥` )",
-      "primaryColorHex": "#FFFDF9",
-      "accentColorHex": "#FFB7C5",
-      "earStyle": "round",
-      "heightMultiplier": 1.0,
-      "baseSpriteScale": 1.0,
-      "songSpriteScale": 1.0,
-      "canRestDuringClimb": true,
-      "tumbleDurationSeconds": 0.6,
-      "tumbleFPS": 12.0,
-      "catchphrases": ["( ´•̥×•̥` )", "와..!", "우와아앙!!", "( ˶ˆᗜˆ˵ )"]
-    },
-    {
       "id": "hachiware",
       "displayName": "하치와레 (Hachiware)",
       "assetFolder": "assets/hachiware",
@@ -63,6 +45,24 @@
       "tumbleDurationSeconds": 0.6,
       "tumbleFPS": 12.0,
       "catchphrases": ["어라라..?", "어떻게든 되겠지!", "으아아앙!", "( ˊᵕˋ )♡"]
+    },
+    {
+      "id": "chiikawa",
+      "displayName": "치이카와 (Chiikawa)",
+      "assetFolder": "assets/chiikawa",
+      "audioFolder": "assets/chiikawa/audio",
+      "playsSongOnClick": false,
+      "clickSpeech": "히익.. 훌쩍 ( ´•̥×•̥` )",
+      "primaryColorHex": "#FFFDF9",
+      "accentColorHex": "#FFB7C5",
+      "earStyle": "round",
+      "heightMultiplier": 1.0,
+      "baseSpriteScale": 1.0,
+      "songSpriteScale": 1.0,
+      "canRestDuringClimb": true,
+      "tumbleDurationSeconds": 0.6,
+      "tumbleFPS": 12.0,
+      "catchphrases": ["( ´•̥×•̥` )", "와..!", "우와아앙!!", "( ˶ˆᗜˆ˵ )"]
     },
     {
       "id": "usagi",

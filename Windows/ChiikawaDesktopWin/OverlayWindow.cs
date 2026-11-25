@@ -80,7 +80,12 @@ public sealed class OverlayWindow : Window
 
         SetupSystemTray();
 
-        foreach (var id in _specBundle.PhysicsAndWorld.PopulationLimits.InitialSpawnCharacters)
+        var range = _specBundle.PhysicsAndWorld.CharacterDimensions.ScaleRange;
+        double startupScale = UserPreferencesStore.Shared.DefaultStartupScale(range.Default);
+        SetScaleForAll(startupScale);
+
+        var fallbackChars = _specBundle.PhysicsAndWorld.PopulationLimits.InitialSpawnCharacters;
+        foreach (var id in UserPreferencesStore.Shared.DefaultStartupCharacters(fallbackChars))
         {
             SpawnCharacter(id);
         }
@@ -141,24 +146,6 @@ public sealed class OverlayWindow : Window
 
         CurrentScale = Math.Clamp(scale, range.Min, range.Max);
         foreach (var c in Characters) c.ScaleFactor = CurrentScale;
-        _canvas.InvalidateVisual();
-    }
-
-    public void ResetAllPositions()
-    {
-        int count = Math.Max(1, Characters.Count);
-        double spacing = Math.Min(140.0, Width / (count + 1));
-        double startX = (Width * 0.5) - (count - 1) * spacing * 0.5;
-
-        for (int i = 0; i < Characters.Count; i++)
-        {
-            var c = Characters[i];
-            c.X = startX + i * spacing;
-            c.Y = Height - 160.0;
-            c.Vx = 0;
-            c.Vy = 0;
-            c.Transition(CharacterStateID.FALL);
-        }
         _canvas.InvalidateVisual();
     }
 
@@ -364,9 +351,52 @@ public sealed class OverlayWindow : Window
             menu.Items.Add(restThis);
         }
 
-        var resetItem = new MenuItem { Header = "모두 위로 부르기 (Reset Positions)" };
-        resetItem.Click += (_, _) => ResetAllPositions();
-        menu.Items.Add(resetItem);
+        // Default Startup Configuration submenu (multi-select startup characters + default scale)
+        var defaultSubmenu = new MenuItem { Header = "기본 시작 설정 (캐릭터 / 크기)" };
+        var fallbackChars = _specBundle.PhysicsAndWorld.PopulationLimits.InitialSpawnCharacters;
+        var orderedIds = _specBundle.CharacterFSM.DefaultCharacters.Select(c => c.Id).ToList();
+
+        defaultSubmenu.Items.Add(new MenuItem { Header = "시작 시 기본 소환 캐릭터 (복수 선택 가능)", IsEnabled = false });
+        foreach (var profile in _specBundle.CharacterFSM.DefaultCharacters)
+        {
+            bool selected = UserPreferencesStore.Shared.IsStartupCharacterSelected(profile.Id, fallbackChars);
+            var cItem = new MenuItem
+            {
+                Header = profile.DisplayName,
+                IsChecked = selected,
+                IsCheckable = true
+            };
+            string pid = profile.Id;
+            cItem.Click += (_, _) => UserPreferencesStore.Shared.ToggleStartupCharacter(pid, fallbackChars, orderedIds);
+            defaultSubmenu.Items.Add(cItem);
+        }
+
+        defaultSubmenu.Items.Add(new Separator());
+        defaultSubmenu.Items.Add(new MenuItem { Header = "시작 시 기본 캐릭터 크기", IsEnabled = false });
+
+        double savedDefaultScale = UserPreferencesStore.Shared.DefaultStartupScale(range.Default);
+        var tierLabels = range.TierLabels.Count == 5
+            ? range.TierLabels
+            : new List<string> { "아주 작게", "작게", "보통", "크게", "아주 크게" };
+        double span = range.Max - range.Min;
+
+        for (int i = 0; i < 5; i++)
+        {
+            double tierScale = range.Min + (i * 0.25) * span;
+            var sItem = new MenuItem
+            {
+                Header = tierLabels[i],
+                IsChecked = Math.Abs(savedDefaultScale - tierScale) < 0.03
+            };
+            double targetScale = tierScale;
+            sItem.Click += (_, _) =>
+            {
+                UserPreferencesStore.Shared.SetDefaultStartupScale(targetScale);
+                SetScaleForAll(targetScale);
+            };
+            defaultSubmenu.Items.Add(sItem);
+        }
+        menu.Items.Add(defaultSubmenu);
 
         var loginItem = new MenuItem
         {

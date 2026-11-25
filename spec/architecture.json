@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.4.0",
+  "schemaVersion": "1.5.1",
   "projectName": "ChiikawaDesktop",
   "description": "Platform-agnostic architecture specification for the Desktop Chiikawa pet application. Inspired by ssskay/desktop-chiikawa-macos with added window-top walking physics, window-riding movement tracking, small-step jumping, window-edge climbing with mid-climb rest, cry/struggle/tumble interactions, and strict low-resource optimization.",
   "designPrinciples": [
@@ -55,21 +55,22 @@
       }
     },
     "SystemTrayController": {
-      "role": "Provides a menu bar / system tray icon AND right-click context menu on characters to toggle each of the 4 unique characters between Summoned (active on desktop) and Resting (removed), adjust character scale continuously via an interactive NSSlider (minScale 0.50x to maxScale 1.35x), toggle wandering, toggle auto-start on OS login (Launch at Login), reset positions, or quit.",
+      "role": "Provides a menu bar / system tray icon AND right-click context menu on characters to toggle each of the 4 unique characters between Summoned (active on desktop) and Resting (removed), configure default startup characters (multi-select) and default startup scale, adjust character scale continuously via an interactive 5-tier NSSlider, toggle wandering, toggle auto-start on OS login (Launch at Login), or quit.",
       "menuActions": [
-        { "id": "toggle_character_chiikawa", "label": "치이카와 (Chiikawa) 소환 / 휴식" },
         { "id": "toggle_character_hachiware", "label": "하치와레 (Hachiware) 소환 / 휴식" },
+        { "id": "toggle_character_chiikawa", "label": "치이카와 (Chiikawa) 소환 / 휴식" },
         { "id": "toggle_character_usagi", "label": "우사기 (Usagi) 소환 / 휴식" },
         { "id": "toggle_character_momonga", "label": "모몽가 (Momonga) 소환 / 휴식" },
         { "id": "toggle_wandering", "label": "자율 돌아다니기 토글 (Toggle Wandering)" },
-        { "id": "scale_slider", "label": "캐릭터 크기 슬라이더 (Scale Slider: 0.50x ~ 1.35x)" },
+        { "id": "scale_slider", "label": "캐릭터 크기 슬라이더 (아주 작게 / 작게 / 보통 / 크게 / 아주 크게)" },
+        { "id": "default_startup_characters", "label": "시작 시 기본 소환 캐릭터 설정 (복수 선택 가능)" },
+        { "id": "default_startup_scale", "label": "시작 시 기본 크기 설정 (아주 작게 ~ 아주 크게)" },
         { "id": "toggle_launch_at_login", "label": "시작프로그램 등록 / 로그인 시 자동 실행 (Launch at Login)" },
-        { "id": "reset_positions", "label": "모두 위로 부르기 (Reset Positions)" },
         { "id": "quit_app", "label": "종료 (Quit)" }
       ],
       "platformMappings": {
-        "macOS": "NSStatusBar + NSMenu + LaunchAgent plist (~/Library/LaunchAgents/com.chiikawa.desktop.plist)",
-        "windows": "System.Windows.Forms.NotifyIcon + WPF ContextMenu + Registry (HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run)"
+        "macOS": "NSStatusBar + NSMenu + UserDefaults + LaunchAgent plist (~/Library/LaunchAgents/com.chiikawa.desktop.plist)",
+        "windows": "System.Windows.Forms.NotifyIcon + WPF ContextMenu + JSON Preferences + Registry (HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run)"
       }
     }
   },
@@ -93,6 +94,11 @@
       "name": "LaunchAtLoginManager",
       "file": "LaunchAtLoginManager",
       "responsibility": "Manages OS auto-start registration (macOS LaunchAgents plist / Windows HKCU Run registry key) so the desktop characters automatically appear when the computer boots."
+    },
+    {
+      "name": "UserPreferencesStore",
+      "file": "UserPreferencesStore",
+      "responsibility": "Persists user-configured default startup characters (multi-select up to 4 characters) and default startup scale tier across app launches, falling back to spec/physics_and_world.json defaults on first run."
     },
     {
       "name": "WindowTracker",

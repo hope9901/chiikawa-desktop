@@ -3,10 +3,11 @@ import CoreGraphics
 
 public protocol OverlayViewDelegate: AnyObject {
     func overlayViewRequestToggleCharacter(characterID: String)
+    func overlayViewRequestToggleDefaultStartupCharacter(characterID: String)
+    func overlayViewRequestSetDefaultStartupScale(_ scale: Double)
     func overlayViewRequestToggleWandering()
     func overlayViewRequestToggleLaunchAtLogin()
     func overlayViewRequestSetScale(_ scale: Double)
-    func overlayViewRequestResetPositions()
     func overlayViewRequestQuit()
 }
 
@@ -139,25 +140,6 @@ public final class OverlayView: NSView {
         for char in characters {
             let oldRect = char.dirtyRect
             char.scaleFactor = scale
-            invalidateVirtualRect(oldRect.union(char.dirtyRect))
-        }
-    }
-
-    public func resetAllPositions() {
-        let mouseScreenLoc = NSEvent.mouseLocation
-        let localMouseX = Double(mouseScreenLoc.x - WindowTracker.virtualDesktopFrame.minX)
-        let activeMonitor = physicsWorld.usableMonitorBounds(atX: localMouseX)
-        let count = max(1, characters.count)
-        let spacing = min(140.0, Double(activeMonitor.width) / Double(count + 1))
-        let startX = Double(activeMonitor.midX) - Double(count - 1) * spacing * 0.5
-
-        for (idx, char) in characters.enumerated() {
-            let oldRect = char.dirtyRect
-            char.x = startX + Double(idx) * spacing
-            char.y = Double(activeMonitor.maxY) - 160.0
-            char.vx = 0
-            char.vy = 0
-            char.transition(to: .fall)
             invalidateVirtualRect(oldRect.union(char.dirtyRect))
         }
     }
@@ -337,6 +319,8 @@ public final class OverlayView: NSView {
         rosterMenuItem.submenu = rosterSubmenu
         menu.addItem(rosterMenuItem)
 
+        menu.addItem(makeDefaultStartupSubmenuItem())
+
         menu.addItem(.separator())
 
         let loginItem = NSMenuItem(
@@ -433,6 +417,69 @@ public final class OverlayView: NSView {
     @objc private func contextToggleCharacter(_ sender: NSMenuItem) {
         if let id = sender.representedObject as? String {
             delegate?.overlayViewRequestToggleCharacter(characterID: id)
+        }
+    }
+
+    public func makeDefaultStartupSubmenuItem() -> NSMenuItem {
+        let sub = NSMenu(title: "기본 시작 설정 (Default)")
+        let fallbackChars = specBundle.physicsAndWorld.populationLimits.initialSpawnCharacters
+        let range = specBundle.physicsAndWorld.characterDimensions.scaleRange
+
+        let charHeader = NSMenuItem(title: "시작 시 기본 소환 캐릭터 (복수 선택 가능)", action: nil, keyEquivalent: "")
+        charHeader.isEnabled = false
+        sub.addItem(charHeader)
+
+        for profile in specBundle.characterFSM.defaultCharacters {
+            let selected = UserPreferencesStore.shared.isStartupCharacterSelected(id: profile.id, fallback: fallbackChars)
+            let item = NSMenuItem(
+                title: profile.displayName,
+                action: #selector(contextToggleDefaultStartupCharacter(_:)),
+                keyEquivalent: ""
+            )
+            item.state = selected ? .on : .off
+            item.representedObject = profile.id
+            item.target = self
+            sub.addItem(item)
+        }
+
+        sub.addItem(.separator())
+
+        let scaleHeader = NSMenuItem(title: "시작 시 기본 캐릭터 크기", action: nil, keyEquivalent: "")
+        scaleHeader.isEnabled = false
+        sub.addItem(scaleHeader)
+
+        let savedDefaultScale = UserPreferencesStore.shared.defaultStartupScale(fallback: range.default)
+        let labels = range.tierLabels.count == 5 ? range.tierLabels : ["아주 작게", "작게", "보통", "크게", "아주 크게"]
+        let span = range.max - range.min
+
+        for i in 0..<5 {
+            let fraction = Double(i) * 0.25
+            let tierScale = range.min + fraction * span
+            let sItem = NSMenuItem(
+                title: labels[i],
+                action: #selector(contextSelectDefaultStartupScale(_:)),
+                keyEquivalent: ""
+            )
+            sItem.state = abs(savedDefaultScale - tierScale) < 0.03 ? .on : .off
+            sItem.representedObject = tierScale
+            sItem.target = self
+            sub.addItem(sItem)
+        }
+
+        let parent = NSMenuItem(title: "기본 시작 설정 (캐릭터 / 크기)", action: nil, keyEquivalent: "")
+        parent.submenu = sub
+        return parent
+    }
+
+    @objc private func contextToggleDefaultStartupCharacter(_ sender: NSMenuItem) {
+        if let id = sender.representedObject as? String {
+            delegate?.overlayViewRequestToggleDefaultStartupCharacter(characterID: id)
+        }
+    }
+
+    @objc private func contextSelectDefaultStartupScale(_ sender: NSMenuItem) {
+        if let scale = sender.representedObject as? Double {
+            delegate?.overlayViewRequestSetDefaultStartupScale(scale)
         }
     }
 

@@ -36,13 +36,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         physicsWorld = PhysicsWorld(spec: specBundle.physicsAndWorld)
 
         setupOverlayWindow()
-        setupStatusBarMenu()
-        setupWorkspaceObservers()
 
-        // Spawn initial characters defined in spec/physics_and_world.json
-        for id in specBundle.physicsAndWorld.populationLimits.initialSpawnCharacters {
+        // Apply saved (or spec default) startup scale BEFORE spawning initial characters
+        let fallbackScale = specBundle.physicsAndWorld.characterDimensions.scaleRange.default
+        let startupScale = UserPreferencesStore.shared.defaultStartupScale(fallback: fallbackScale)
+        overlayView.setScaleForAll(startupScale)
+
+        // Spawn initial characters (user-configured default startup characters or spec fallback)
+        // BEFORE building the status bar menu so the menu immediately reflects active count & "휴식" state!
+        let fallbackChars = specBundle.physicsAndWorld.populationLimits.initialSpawnCharacters
+        let startupChars = UserPreferencesStore.shared.defaultStartupCharacters(fallback: fallbackChars)
+        for id in startupChars {
             _ = overlayView.spawnCharacter(id: id)
         }
+
+        setupStatusBarMenu()
+        setupWorkspaceObservers()
 
         scheduleAdaptiveTimer(interval: overlayView.recommendedTimerInterval)
     }
@@ -160,13 +169,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         menu.addItem(overlayView.makeScaleSliderMenuItem())
         menu.addItem(.separator())
 
-        let resetItem = NSMenuItem(
-            title: "모두 위로 부르기 (Reset Positions)",
-            action: #selector(menuResetPositions),
-            keyEquivalent: "r"
-        )
-        resetItem.target = self
-        menu.addItem(resetItem)
+        menu.addItem(overlayView.makeDefaultStartupSubmenuItem())
 
         let loginItem = NSMenuItem(
             title: "시작프로그램 등록 (로그인 시 자동 실행)",
@@ -281,10 +284,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         }
     }
 
-    @objc private func menuResetPositions() {
-        overlayViewRequestResetPositions()
-    }
-
     @objc private func menuToggleLaunchAtLogin() {
         overlayViewRequestToggleLaunchAtLogin()
     }
@@ -298,6 +297,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
         rebuildStatusBarMenu()
     }
 
+    public func overlayViewRequestToggleDefaultStartupCharacter(characterID: String) {
+        let fallback = specBundle.physicsAndWorld.populationLimits.initialSpawnCharacters
+        let orderedIDs = specBundle.characterFSM.defaultCharacters.map { $0.id }
+        UserPreferencesStore.shared.toggleStartupCharacter(id: characterID, fallback: fallback, orderedValidIDs: orderedIDs)
+        rebuildStatusBarMenu()
+    }
+
+    public func overlayViewRequestSetDefaultStartupScale(_ scale: Double) {
+        UserPreferencesStore.shared.setDefaultStartupScale(scale)
+        overlayView.setScaleForAll(scale)
+        rebuildStatusBarMenu()
+    }
+
     public func overlayViewRequestToggleWandering() {
         overlayView.wanderingEnabled.toggle()
         rebuildStatusBarMenu()
@@ -305,10 +317,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
 
     public func overlayViewRequestSetScale(_ scale: Double) {
         overlayView.setScaleForAll(scale)
-    }
-
-    public func overlayViewRequestResetPositions() {
-        overlayView.resetAllPositions()
     }
 
     public func overlayViewRequestToggleLaunchAtLogin() {
