@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using Forms = System.Windows.Forms;
 
 namespace ChiikawaDesktopWin;
 
@@ -53,30 +54,36 @@ public sealed class WindowTracker
         }
         _lastPollTime = now;
 
-        double screenWidth = SystemParameters.PrimaryScreenWidth;
-        double screenHeight = SystemParameters.PrimaryScreenHeight;
-        Rect workArea = SystemParameters.WorkArea; // Excludes Windows Taskbar
+        double vLeft = SystemParameters.VirtualScreenLeft;
+        double vTop = SystemParameters.VirtualScreenTop;
+        double vWidth = SystemParameters.VirtualScreenWidth;
+        double vHeight = SystemParameters.VirtualScreenHeight;
+        double vBottom = vTop + vHeight;
 
-        // Convert top-down WorkArea to bottom-up coordinates (0 = bottom of primary screen)
-        double floorY = Math.Max(0.0, screenHeight - workArea.Bottom);
-        double floorMinX = Math.Max(0.0, workArea.Left);
-        double floorMaxX = Math.Min(screenWidth, workArea.Right);
+        var segments = new List<PlatformSegment>();
+        var screens = Forms.Screen.AllScreens;
 
-        var segments = new List<PlatformSegment>
+        // 1. Add a desktop floor segment for EACH connected monitor
+        for (int idx = 0; idx < screens.Length; idx++)
         {
-            new PlatformSegment(
-                Id: "floor",
+            var scr = screens[idx];
+            double localMinX = scr.WorkingArea.Left - vLeft;
+            double localMaxX = scr.WorkingArea.Right - vLeft;
+            double localFloorY = Math.Max(0.0, vBottom - scr.WorkingArea.Bottom);
+
+            segments.Add(new PlatformSegment(
+                Id: idx == 0 ? "floor" : $"floor_{idx}",
                 WindowID: 0,
-                OwnerName: "Desktop Floor",
-                RawWindowMinX: floorMinX,
-                RawWindowMaxX: floorMaxX,
-                WindowBottomY: floorY,
-                MinX: floorMinX,
-                MaxX: floorMaxX,
-                Y: floorY,
+                OwnerName: $"Desktop Floor {idx + 1}",
+                RawWindowMinX: localMinX,
+                RawWindowMaxX: localMaxX,
+                WindowBottomY: localFloorY,
+                MinX: localMinX,
+                MaxX: localMaxX,
+                Y: localFloorY,
                 IsFloor: true
-            )
-        };
+            ));
+        }
 
         var occludingRects = new List<Rect>();
 
@@ -109,34 +116,33 @@ public sealed class WindowTracker
                     return true;
             }
 
-            // Convert physical pixels to WPF logical points if DPI scaled
-            double dpiScale = GetDpiForWindow(hwnd) / 96.0;
-            if (dpiScale <= 0) dpiScale = 1.0;
-
-            double winLeft = rawRect.Left / dpiScale;
-            double winTop = rawRect.Top / dpiScale;
-            double winRight = rawRect.Right / dpiScale;
-            double winBottom = rawRect.Bottom / dpiScale;
+            double winLeft = rawRect.Left - vLeft;
+            double winRight = rawRect.Right - vLeft;
             double winW = winRight - winLeft;
-            double winH = winBottom - winTop;
+            double winH = rawRect.Bottom - rawRect.Top;
 
             if (winW < _rules.MinWindowWidth || winH < _rules.MinWindowHeight)
                 return true;
 
-            // Exclude windows moved completely onto secondary monitors
-            if (winRight <= 0 || winLeft >= screenWidth || winBottom <= 0 || winTop >= screenHeight)
-                return true;
-
-            // Convert top-left origin to bottom-left origin
-            double topEdgeY = screenHeight - winTop;
-            double bottomEdgeY = screenHeight - winBottom;
-            double minX = Math.Max(floorMinX, winLeft);
-            double maxX = Math.Min(floorMaxX, winRight);
+            double topEdgeY = vBottom - rawRect.Top;
+            double bottomEdgeY = vBottom - rawRect.Bottom;
+            double minX = Math.Max(0.0, winLeft);
+            double maxX = Math.Min(vWidth, winRight);
 
             if (maxX - minX < 48.0)
                 return true;
 
-            if (winTop >= _rules.MinTopClearanceFromScreenTop && topEdgeY >= floorY + 16.0 && topEdgeY <= (screenHeight - workArea.Top))
+            double floorY = segments[0].Y;
+            foreach (var fSeg in segments)
+            {
+                if (fSeg.IsFloor && ((winLeft + winRight) * 0.5) >= fSeg.MinX && ((winLeft + winRight) * 0.5) <= fSeg.MaxX)
+                {
+                    floorY = fSeg.Y;
+                    break;
+                }
+            }
+
+            if (topEdgeY >= floorY + 16.0 && topEdgeY <= (vHeight - _rules.MinTopClearanceFromScreenTop))
             {
                 int winId = hwnd.ToInt32();
                 var baseSeg = new PlatformSegment(

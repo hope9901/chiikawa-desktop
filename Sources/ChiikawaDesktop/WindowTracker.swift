@@ -1,8 +1,8 @@
 import AppKit
 import CoreGraphics
 
-/// Represents a horizontal surface (either the desktop floor or the top edge of an OS window)
-/// in normalized bottom-left coordinates (origin: bottom-left of main screen).
+/// Represents a horizontal surface (either a monitor's desktop floor or the top edge of an OS window)
+/// in overlay-local bottom-left coordinates (origin: bottom-left of the combined multi-monitor union rect).
 public struct PlatformSegment: Equatable {
     public let id: String
     public let windowID: Int
@@ -18,12 +18,22 @@ public struct PlatformSegment: Equatable {
     public var width: Double { maxX - minX }
 }
 
-/// Polls macOS window geometry and extracts walkable top edges of visible windows plus the desktop floor.
+/// Polls macOS window geometry across ALL connected monitors and extracts walkable top edges
+/// of visible windows plus each monitor's desktop floor.
 public final class WindowTracker {
     private let rules: PhysicsAndWorldSpec.WindowDetectionRulesSpec
     private let pollInterval: TimeInterval
     private var lastPollTimestamp: TimeInterval = 0
     private(set) public var cachedPlatforms: [PlatformSegment] = []
+
+    /// Union bounding rectangle of all connected screens in global AppKit coordinates (bottom-left of primary screen = 0,0).
+    public static var virtualDesktopFrame: CGRect {
+        let screens = NSScreen.screens
+        guard let first = screens.first else {
+            return CGRect(x: 0, y: 0, width: 1440, height: 900)
+        }
+        return screens.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+    }
 
     public init(spec: PhysicsAndWorldSpec) {
         self.rules = spec.windowDetectionRules
@@ -39,37 +49,46 @@ public final class WindowTracker {
         }
         lastPollTimestamp = now
 
-        // IMPORTANT: In multi-monitor setups, NSScreen.main changes whenever focus moves to a second monitor!
-        // CGWindowListCopyWindowInfo ALWAYS uses the Primary Screen (NSScreen.screens.first) top-left origin.
-        // Therefore, we must ALWAYS use NSScreen.screens.first so coordinates never shift or push characters underground.
-        guard let primaryScreen = NSScreen.screens.first else { return cachedPlatforms }
-        let fullFrame = primaryScreen.frame
-        let visibleFrame = primaryScreen.visibleFrame
-        let screenHeight = Double(fullFrame.height)
-        let screenMinX = Double(fullFrame.minX)
-        let screenMaxX = Double(fullFrame.maxX)
+        let screens = NSScreen.screens
+        guard let primaryScreen = screens.first else { return cachedPlatforms }
+        let primaryHeight = Double(primaryScreen.frame.height)
+        let unionFrame = WindowTracker.virtualDesktopFrame
+        let unionOriginX = Double(unionFrame.minX)
+        let unionOriginY = Double(unionFrame.minY)
 
         var segments: [PlatformSegment] = []
+        var monitorVisibleRects: [CGRect] = []
 
-        // 1. Add the desktop floor (top of Dock / bottom of visible screen on the primary monitor)
-        let floorY = max(0.0, Double(visibleFrame.minY - fullFrame.minY))
-        let floorMinX = Double(visibleFrame.minX - fullFrame.minX)
-        let floorMaxX = Double(visibleFrame.maxX - fullFrame.minX)
-        let floorSegment = PlatformSegment(
-            id: "floor",
-            windowID: 0,
-            ownerName: "Desktop Floor",
-            rawWindowMinX: floorMinX,
-            rawWindowMaxX: floorMaxX,
-            windowBottomY: floorY,
-            minX: floorMinX,
-            maxX: floorMaxX,
-            y: floorY,
-            isFloor: true
-        )
-        segments.append(floorSegment)
+        // 1. Add a desktop floor segment for EACH connected monitor (accounting for its Dock & Menu Bar)
+        for (idx, screen) in screens.enumerated() {
+            let vis = screen.visibleFrame
+            let localMinX = Double(vis.minX) - unionOriginX
+            let localMaxX = Double(vis.maxX) - unionOriginX
+            let localFloorY = max(0.0, Double(vis.minY) - unionOriginY)
+            let localTopY = Double(vis.maxY) - unionOriginY
 
-        // 2. Query visible windows via CoreGraphics (front-to-back order)
+            monitorVisibleRects.append(CGRect(
+                x: localMinX,
+                y: localFloorY,
+                width: localMaxX - localMinX,
+                height: max(100.0, localTopY - localFloorY)
+            ))
+
+            segments.append(PlatformSegment(
+                id: idx == 0 ? "floor" : "floor_\(idx)",
+                windowID: 0,
+                ownerName: "Desktop Floor \(idx + 1)",
+                rawWindowMinX: localMinX,
+                rawWindowMaxX: localMaxX,
+                windowBottomY: localFloorY,
+                minX: localMinX,
+                maxX: localMaxX,
+                y: localFloorY,
+                isFloor: true
+            ))
+        }
+
+        // 2. Query visible windows across all monitors via CoreGraphics (front-to-back order)
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             cachedPlatforms = segments
@@ -105,25 +124,27 @@ public final class WindowTracker {
                 continue
             }
 
-            // Reject windows that have been moved completely onto another monitor (outside primary screen bounds)
-            if (cgX + cgW) <= screenMinX || cgX >= screenMaxX || (cgY + cgH) <= 0.0 || cgY >= screenHeight {
+            // Convert from CG global coordinates (top-left of primary screen = 0,0)
+            // to AppKit global coordinates (bottom-left of primary screen = 0,0),
+            // then to overlay-local coordinates (bottom-left of unionFrame = 0,0):
+            let globalTopY = primaryHeight - cgY
+            let globalBottomY = primaryHeight - (cgY + cgH)
+            let topEdgeY = globalTopY - unionOriginY
+            let bottomEdgeY = globalBottomY - unionOriginY
+            let rawMinX = cgX - unionOriginX
+            let rawMaxX = rawMinX + cgW
+
+            let winMidX = (rawMinX + rawMaxX) * 0.5
+            // Find the monitor that hosts this window's horizontal center (or overlaps it)
+            guard let hostMonitor = monitorVisibleRects.first(where: { winMidX >= Double($0.minX) && winMidX <= Double($0.maxX) })
+                ?? monitorVisibleRects.first(where: { rawMaxX > Double($0.minX) && rawMinX < Double($0.maxX) }) else {
                 continue
             }
 
-            // CGWindowBounds uses primary screen top-left origin: cgY is distance from top of primary screen.
-            let topEdgeY = screenHeight - cgY
-            let bottomEdgeY = screenHeight - (cgY + cgH)
-            let rawMinX = cgX - screenMinX
-            let rawMaxX = rawMinX + cgW
-            let minX = max(floorMinX, rawMinX)
-            let maxX = min(floorMaxX, rawMaxX)
+            let minX = max(Double(unionFrame.minX) - unionOriginX, rawMinX)
+            let maxX = min(Double(unionFrame.maxX) - unionOriginX, rawMaxX)
 
             guard maxX - minX >= 48.0 else {
-                continue
-            }
-
-            // Also ensure the window top edge lies within the primary monitor's vertical visible range
-            guard topEdgeY >= floorSegment.y + 16.0 && topEdgeY <= Double(visibleFrame.maxY - fullFrame.minY) else {
                 continue
             }
 
@@ -134,8 +155,10 @@ public final class WindowTracker {
                 height: cgH
             )
 
-            let clearanceFromTop = cgY
-            if clearanceFromTop >= rules.minTopClearanceFromScreenTop {
+            let hostFloorY = Double(hostMonitor.minY)
+            let hostCeilingY = Double(hostMonitor.maxY)
+
+            if topEdgeY >= hostFloorY + 16.0 && topEdgeY <= (hostCeilingY - rules.minTopClearanceFromScreenTop) {
                 let winNumber = (info[kCGWindowNumber as String] as? Int) ?? 0
                 let baseSegment = PlatformSegment(
                     id: "win_\(winNumber)",
@@ -143,7 +166,7 @@ public final class WindowTracker {
                     ownerName: ownerName,
                     rawWindowMinX: rawMinX,
                     rawWindowMaxX: rawMaxX,
-                    windowBottomY: max(floorSegment.y, bottomEdgeY),
+                    windowBottomY: max(hostFloorY, bottomEdgeY),
                     minX: minX,
                     maxX: maxX,
                     y: topEdgeY,

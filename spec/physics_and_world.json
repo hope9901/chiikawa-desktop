@@ -47,9 +47,9 @@
     "freeFallWhenOutOfScreenBounds": true,
     "freeFallWhenCharacterExceedsWindowEdge": true,
     "requireFullCharacterBodyInsideScreen": true,
-    "pinToPrimaryScreenInMultiMonitor": true,
+    "spanAllMonitors": true,
     "hardFloorClampEnabled": true,
-    "description": "All coordinates are pinned to the primary overlay screen (NSScreen.screens.first) rather than NSScreen.main (which shifts across monitors of different resolutions on focus change). Windows dragged onto secondary monitors are excluded once outside the primary screen bounds, detaching the character into free-fall onto the primary screen's floor (never falling below floorY)."
+    "description": "The overlay spans the union of all connected monitors (virtual desktop). Each monitor generates its own floor segment (floor_0, floor_1, ...) and per-monitor vertical bounds (minY..maxY). Characters can be dragged across monitors, ride windows dragged across monitors, or walk across adjacent monitors while always clamping to the floorY of whichever monitor their X coordinate currently resides on."
   },
   "characterDimensions": {
     "width": 84.0,

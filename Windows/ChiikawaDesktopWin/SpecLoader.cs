@@ -90,7 +90,7 @@ public sealed class PhysicsAndWorldSpec
         [JsonPropertyName("freeFallWhenOutOfScreenBounds")] public bool FreeFallWhenOutOfScreenBounds { get; set; } = true;
         [JsonPropertyName("freeFallWhenCharacterExceedsWindowEdge")] public bool FreeFallWhenCharacterExceedsWindowEdge { get; set; } = true;
         [JsonPropertyName("requireFullCharacterBodyInsideScreen")] public bool RequireFullCharacterBodyInsideScreen { get; set; } = true;
-        [JsonPropertyName("pinToPrimaryScreenInMultiMonitor")] public bool PinToPrimaryScreenInMultiMonitor { get; set; } = true;
+        [JsonPropertyName("spanAllMonitors")] public bool SpanAllMonitors { get; set; } = true;
         [JsonPropertyName("hardFloorClampEnabled")] public bool HardFloorClampEnabled { get; set; } = true;
     }
 
@@ -147,6 +147,8 @@ public sealed class CharacterFSMSpec
         [JsonPropertyName("accentColorHex")] public string AccentColorHex { get; set; } = "#FFB7C5";
         [JsonPropertyName("earStyle")] public string EarStyle { get; set; } = "round";
         [JsonPropertyName("heightMultiplier")] public double HeightMultiplier { get; set; } = 1.0;
+        [JsonPropertyName("baseSpriteScale")] public double BaseSpriteScale { get; set; } = 1.0;
+        [JsonPropertyName("songSpriteScale")] public double SongSpriteScale { get; set; } = 1.0;
         [JsonPropertyName("canRestDuringClimb")] public bool CanRestDuringClimb { get; set; } = true;
         [JsonPropertyName("tumbleDurationSeconds")] public double TumbleDurationSeconds { get; set; } = 1.15;
         [JsonPropertyName("tumbleFPS")] public double TumbleFPS { get; set; } = 8.0;

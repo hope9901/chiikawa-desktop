@@ -90,8 +90,10 @@ public final class CharacterEntity {
     }
 
     var spriteRenderScale: Double {
-        // Momonga's tail takes up part of the sprite cell, so the unscaled head reads smaller.
-        profile.id == "momonga" ? 1.16 : 1.0
+        if state == .cryClick && profile.playsSongOnClick {
+            return profile.songSpriteScale
+        }
+        return profile.baseSpriteScale
     }
 
     private var spriteBoundsHeight: Double {
@@ -161,12 +163,15 @@ public final class CharacterEntity {
 
         let timings = fsmSpec.interactionTimings
         let usableBounds = physics.usableScreenBounds
+        let monitorBounds = physics.usableMonitorBounds(atX: x)
         let halfW = width * 0.42
         let effectiveH = spriteBoundsHeight
         let minScreenX = Double(usableBounds.minX) + halfW
         let maxScreenX = Double(usableBounds.maxX) - halfW
-        let maxScreenY = Double(usableBounds.maxY) - effectiveH * 0.92
-        let floorY = max(0.0, platforms.first(where: { $0.isFloor })?.y ?? Double(usableBounds.minY))
+        let maxScreenY = Double(monitorBounds.maxY) - effectiveH * 0.92
+        let activeFloorSegment = platforms.first(where: { $0.isFloor && x >= $0.minX && x <= $0.maxX })
+            ?? platforms.first(where: { $0.isFloor })
+        let floorY = max(0.0, activeFloorSegment?.y ?? Double(monitorBounds.minY))
 
         // Hard safety guard: if y somehow dropped below floorY (e.g., monitor reconfiguration), snap back to floor
         if physics.ridingRules.hardFloorClampEnabled && y < floorY - 2.0 && state != .fall && state != .fallFromGrab {
@@ -530,7 +535,7 @@ public final class CharacterEntity {
                 y = floorY
                 vx = 0
                 vy = 0
-                currentPlatform = platforms.first(where: { $0.isFloor })
+                currentPlatform = activeFloorSegment
                 transition(to: .tumble)
                 return
             }

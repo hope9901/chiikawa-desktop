@@ -22,17 +22,9 @@ public sealed class PhysicsWorld
         Dimensions = spec.CharacterDimensions;
     }
 
-    /// Returns the usable screen area (excluding Windows Taskbar) in bottom-left coordinates.
-    public Rect UsableScreenBounds
-    {
-        get
-        {
-            double screenHeight = SystemParameters.PrimaryScreenHeight;
-            Rect work = SystemParameters.WorkArea;
-            double bottomY = Math.Max(0.0, screenHeight - work.Bottom);
-            return new Rect(work.Left, bottomY, work.Width, work.Height);
-        }
-    }
+    /// Returns the combined virtual desktop area across all connected monitors in bottom-left coordinates.
+    public Rect UsableScreenBounds =>
+        new(0, 0, SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
 
     public bool IsCharacterBodyInsideScreen(
         double centerX,

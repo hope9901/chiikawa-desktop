@@ -17,22 +17,51 @@ public final class PhysicsWorld {
         self.dimensions = spec.characterDimensions
     }
 
-    /// Returns the usable screen area (excluding Dock and top Menu Bar) on the primary overlay monitor in bottom-left coordinates.
+    /// Returns the combined usable screen area across all connected monitors in overlay-local bottom-left coordinates.
     public var usableScreenBounds: CGRect {
-        guard let screen = NSScreen.screens.first else {
-            return CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let union = WindowTracker.virtualDesktopFrame
+        return CGRect(x: 0, y: 0, width: union.width, height: union.height)
+    }
+
+    /// Returns the usable bounds (excluding Dock and Menu Bar) of the specific monitor that contains `centerX`
+    /// in overlay-local bottom-left coordinates.
+    public func usableMonitorBounds(atX centerX: Double) -> CGRect {
+        let union = WindowTracker.virtualDesktopFrame
+        let unionOriginX = Double(union.minX)
+        let unionOriginY = Double(union.minY)
+        let screens = NSScreen.screens
+
+        var bestScreen = screens.first
+        var bestDist = Double.greatestFiniteMagnitude
+
+        for screen in screens {
+            let localMinX = Double(screen.frame.minX) - unionOriginX
+            let localMaxX = Double(screen.frame.maxX) - unionOriginX
+            if centerX >= localMinX && centerX <= localMaxX {
+                bestScreen = screen
+                break
+            }
+            let dist = min(abs(centerX - localMinX), abs(centerX - localMaxX))
+            if dist < bestDist {
+                bestDist = dist
+                bestScreen = screen
+            }
         }
-        let full = screen.frame
-        let visible = screen.visibleFrame
+
+        guard let target = bestScreen else {
+            return usableScreenBounds
+        }
+        let vis = target.visibleFrame
         return CGRect(
-            x: visible.minX - full.minX,
-            y: max(0.0, visible.minY - full.minY),
-            width: visible.width,
-            height: visible.height
+            x: Double(vis.minX) - unionOriginX,
+            y: max(0.0, Double(vis.minY) - unionOriginY),
+            width: Double(vis.width),
+            height: Double(vis.height)
         )
     }
 
-    /// Checks if the entire character body (width & height) at `(centerX, feetY)` fits inside the monitor's usable screen bounds.
+    /// Checks if the entire character body (width & height) at `(centerX, feetY)` fits inside the combined multi-monitor horizontal bounds
+    /// and the vertical visible bounds of the monitor at `centerX`.
     public func isCharacterBodyInsideScreen(
         centerX: Double,
         feetY: Double,
@@ -45,10 +74,13 @@ public final class PhysicsWorld {
         let rightEdge = centerX + halfW
         let topEdge = feetY + charHeight * 0.92
 
-        let screenMinX = Double(usableBounds.minX)
-        let screenMaxX = Double(usableBounds.maxX)
-        let screenMaxY = Double(usableBounds.maxY)
-        let screenMinY = Double(usableBounds.minY) - 4.0
+        let totalBounds = usableScreenBounds
+        let monitorBounds = usableMonitorBounds(atX: centerX)
+
+        let screenMinX = Double(totalBounds.minX)
+        let screenMaxX = Double(totalBounds.maxX)
+        let screenMaxY = Double(monitorBounds.maxY)
+        let screenMinY = Double(monitorBounds.minY) - 4.0
 
         return leftEdge >= screenMinX &&
                rightEdge <= screenMaxX &&

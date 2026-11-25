@@ -63,10 +63,12 @@ public final class OverlayView: NSView {
             return false
         }
 
-        let screenBounds = self.bounds
-        let margin = 140.0
-        let randomX = Double.random(in: (Double(screenBounds.minX) + margin)...(max(Double(screenBounds.minX) + margin + 10, Double(screenBounds.maxX) - margin)))
-        let spawnY = Double(screenBounds.maxY) - 140.0
+        let primaryBounds = physicsWorld.usableMonitorBounds(atX: Double(self.bounds.midX))
+        let margin = 120.0
+        let minSpawnX = Double(primaryBounds.minX) + margin
+        let maxSpawnX = max(minSpawnX + 10.0, Double(primaryBounds.maxX) - margin)
+        let randomX = Double.random(in: minSpawnX...maxSpawnX)
+        let spawnY = Double(primaryBounds.maxY) - 140.0
 
         let entity = CharacterEntity(
             profile: profile,
@@ -110,15 +112,17 @@ public final class OverlayView: NSView {
     }
 
     public func resetAllPositions() {
-        let screenBounds = self.bounds
+        let mouseScreenLoc = NSEvent.mouseLocation
+        let localMouseX = Double(mouseScreenLoc.x - WindowTracker.virtualDesktopFrame.minX)
+        let activeMonitor = physicsWorld.usableMonitorBounds(atX: localMouseX)
         let count = max(1, characters.count)
-        let spacing = min(140.0, Double(screenBounds.width) / Double(count + 1))
-        let startX = Double(screenBounds.midX) - Double(count - 1) * spacing * 0.5
+        let spacing = min(140.0, Double(activeMonitor.width) / Double(count + 1))
+        let startX = Double(activeMonitor.midX) - Double(count - 1) * spacing * 0.5
 
         for (idx, char) in characters.enumerated() {
             let oldRect = char.dirtyRect
             char.x = startX + Double(idx) * spacing
-            char.y = Double(screenBounds.maxY) - 160.0
+            char.y = Double(activeMonitor.maxY) - 160.0
             char.vx = 0
             char.vy = 0
             char.transition(to: .fall)
@@ -486,7 +490,9 @@ public final class OverlayView: NSView {
             if char.state == .climbWall || char.state == .climbRest || char.state == .jumpStep {
                 ctx.rotate(by: tiltAngle)
             }
-            ctx.scaleBy(x: squashX * (char.facingRight ? 1.0 : -1.0), y: squashY)
+            let isSongPose = char.state == .cryClick && char.profile.playsSongOnClick
+            let facing: CGFloat = char.facingRight ? 1.0 : -1.0
+            ctx.scaleBy(x: (isSongPose ? 1.0 : squashX) * facing, y: isSongPose ? 1.0 : squashY)
             let renderScale = CGFloat(char.spriteRenderScale)
             let spriteWidth = w * renderScale
             let spriteHeight = h * renderScale * CGFloat(customSprite.height) / CGFloat(customSprite.width)

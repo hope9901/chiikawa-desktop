@@ -49,10 +49,10 @@ public sealed class OverlayWindow : Window
         Topmost = true;
         ShowInTaskbar = false;
 
-        Left = 0;
-        Top = 0;
-        Width = SystemParameters.PrimaryScreenWidth;
-        Height = SystemParameters.PrimaryScreenHeight;
+        Left = SystemParameters.VirtualScreenLeft;
+        Top = SystemParameters.VirtualScreenTop;
+        Width = SystemParameters.VirtualScreenWidth;
+        Height = SystemParameters.VirtualScreenHeight;
 
         _canvas = new OverlayCanvas(this, _spriteRepository);
         Content = _canvas;
@@ -439,10 +439,12 @@ public sealed class OverlayCanvas : FrameworkElement
             var frame = _sprites.GetFrame(c.Profile.Id, c.State, c.StateElapsed, c.AnimPhase);
             if (frame != null)
             {
-                double spriteH = h * frame.PixelHeight / Math.Max(1.0, frame.PixelWidth);
+                double renderScale = c.SpriteRenderScale;
+                double spriteW = w * renderScale;
+                double spriteH = h * renderScale * frame.PixelHeight / Math.Max(1.0, frame.PixelWidth);
                 dc.PushTransform(new TranslateTransform(c.X, topDownFeetY));
                 dc.PushTransform(new ScaleTransform(c.FacingRight ? 1.0 : -1.0, 1.0));
-                dc.DrawImage(frame, new Rect(-w * 0.5, -spriteH, w, spriteH));
+                dc.DrawImage(frame, new Rect(-spriteW * 0.5, -spriteH, spriteW, spriteH));
                 dc.Pop();
                 dc.Pop();
 

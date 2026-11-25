@@ -64,7 +64,7 @@ public struct PhysicsAndWorldSpec: Codable {
         public let freeFallWhenOutOfScreenBounds: Bool
         public let freeFallWhenCharacterExceedsWindowEdge: Bool
         public let requireFullCharacterBodyInsideScreen: Bool
-        public let pinToPrimaryScreenInMultiMonitor: Bool
+        public let spanAllMonitors: Bool
         public let hardFloorClampEnabled: Bool
         public let description: String
     }
@@ -123,6 +123,8 @@ public struct CharacterFSMSpec: Codable {
         public let accentColorHex: String
         public let earStyle: String
         public let heightMultiplier: Double
+        public let baseSpriteScale: Double
+        public let songSpriteScale: Double
         public let canRestDuringClimb: Bool
         public let tumbleDurationSeconds: Double
         public let tumbleFPS: Double

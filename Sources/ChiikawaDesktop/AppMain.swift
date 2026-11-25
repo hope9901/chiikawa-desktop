@@ -47,7 +47,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     }
 
     private func setupOverlayWindow() {
-        let screenFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let screenFrame = WindowTracker.virtualDesktopFrame
 
         overlayWindow = NSWindow(
             contentRect: screenFrame,
@@ -171,15 +171,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 
-        // Resize overlay window if monitor resolution or Dock geometry changes
+        // Resize overlay window if monitor resolution, multi-monitor layout, or Dock geometry changes
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, let screenFrame = NSScreen.screens.first?.frame else { return }
-            self.overlayWindow.setFrame(screenFrame, display: true)
-            self.overlayView.frame = NSRect(origin: .zero, size: screenFrame.size)
+            guard let self else { return }
+            let unionFrame = WindowTracker.virtualDesktopFrame
+            self.overlayWindow.setFrame(unionFrame, display: true)
+            self.overlayView.frame = NSRect(origin: .zero, size: unionFrame.size)
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 

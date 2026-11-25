@@ -85,6 +85,10 @@ public sealed class CharacterEntity
 
     public double Width => _physics.Dimensions.Width * ScaleFactor;
     public double Height => _physics.Dimensions.Height * ScaleFactor;
+    public double SpriteRenderScale =>
+        (State == CharacterStateID.CRY_CLICK && Profile.PlaysSongOnClick)
+            ? Profile.SongSpriteScale
+            : Profile.BaseSpriteScale;
     public double SpriteBoundsHeight => Height * Profile.HeightMultiplier;
 
     public Rect HitboxRect
@@ -134,7 +138,9 @@ public sealed class CharacterEntity
         double minScreenX = usable.Left + halfW;
         double maxScreenX = usable.Right - halfW;
         double maxScreenY = usable.Bottom - effectiveH * 0.92;
-        double floorY = Math.Max(0.0, platforms.FirstOrDefault(p => p.IsFloor)?.Y ?? usable.Top);
+        var activeFloorSegment = platforms.FirstOrDefault(p => p.IsFloor && X >= p.MinX && X <= p.MaxX)
+            ?? platforms.FirstOrDefault(p => p.IsFloor);
+        double floorY = Math.Max(0.0, activeFloorSegment?.Y ?? usable.Top);
 
         if (_physics.RidingRules.HardFloorClampEnabled && Y < floorY - 2.0 &&
             State is not CharacterStateID.FALL and not CharacterStateID.FALL_FROM_GRAB)
@@ -459,7 +465,7 @@ public sealed class CharacterEntity
                     Y = floorY;
                     Vx = 0;
                     Vy = 0;
-                    CurrentPlatform = platforms.FirstOrDefault(p => p.IsFloor);
+                    CurrentPlatform = activeFloorSegment;
                     Transition(CharacterStateID.TUMBLE);
                     return;
                 }
