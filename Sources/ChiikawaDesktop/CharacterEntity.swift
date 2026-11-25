@@ -634,10 +634,19 @@ public final class CharacterEntity {
             vy = -60.0
             transition(to: .fallFromGrab)
         } else if state == .cryClick && profile.playsSongOnClick {
-            // Single click confirmed! Toggle full song playback (start if stopped, stop if already singing)
-            if let songDuration = AudioAssetPlayer.shared.toggleOrPlayClickSong(for: profile) {
-                targetStateDuration = stateElapsed + songDuration
-                showSpeech(profile.clickSpeech, duration: 4.0)
+            // Single click confirmed! Toggle full song playback (if no other character is already singing)
+            if let songDuration = AudioAssetPlayer.shared.toggleOrPlayClickSong(
+                for: profile,
+                allowConcurrent: fsmSpec.interactionTimings.allowConcurrentSinging
+            ) {
+                if songDuration < 0 {
+                    // Another character is already singing -> do not sing concurrently!
+                    showSpeech("지금은 친구가 노래 부르는 중이야! 🎵", duration: 2.0)
+                    transition(to: .idle)
+                } else {
+                    targetStateDuration = stateElapsed + songDuration
+                    showSpeech(profile.clickSpeech, duration: 4.0)
+                }
             } else {
                 // Clicked again while singing -> stop song and return to IDLE
                 transition(to: .idle)

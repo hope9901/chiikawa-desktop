@@ -87,7 +87,7 @@
     {
       "name": "AudioAssetPlayer",
       "file": "AudioAssetPlayer",
-      "responsibility": "Scans assets/<character_id>/audio/*.(mp3|wav|m4a) and plays character songs when characters with playsSongOnClick=true (Hachiware, Usagi) are single-clicked, stopping playback if the character is dragged or removed."
+      "responsibility": "Scans assets/<character_id>/audio/*.(mp3|wav|m4a) and plays character songs when characters with playsSongOnClick=true (Hachiware, Usagi) are single-clicked. Enforces single-singer exclusivity (allowConcurrentSinging=false) so two characters never sing simultaneously."
     },
     {
       "name": "LaunchAtLoginManager",

@@ -572,10 +572,20 @@ public sealed class CharacterEntity
         }
         else if (State == CharacterStateID.CRY_CLICK && Profile.PlaysSongOnClick)
         {
-            if (AudioAssetPlayer.Shared.ToggleOrPlayClickSong(Profile) is double songDuration)
+            if (AudioAssetPlayer.Shared.ToggleOrPlayClickSong(
+                Profile,
+                _fsmSpec.InteractionTimings.AllowConcurrentSinging) is double songDuration)
             {
-                TargetStateDuration = StateElapsed + songDuration;
-                ShowSpeech(Profile.ClickSpeech);
+                if (songDuration < 0)
+                {
+                    ShowSpeech("지금은 친구가 노래 부르는 중이야! 🎵");
+                    Transition(CharacterStateID.IDLE);
+                }
+                else
+                {
+                    TargetStateDuration = StateElapsed + songDuration;
+                    ShowSpeech(Profile.ClickSpeech);
+                }
             }
             else
             {

@@ -158,6 +158,7 @@ public sealed class CharacterFSMSpec
         [JsonPropertyName("holdThresholdSeconds")] public double HoldThresholdSeconds { get; set; } = 0.18;
         [JsonPropertyName("clickCryDurationSeconds")] public double ClickCryDurationSeconds { get; set; } = 1.6;
         [JsonPropertyName("playFullSongOnClick")] public bool PlayFullSongOnClick { get; set; } = true;
+        [JsonPropertyName("allowConcurrentSinging")] public bool AllowConcurrentSinging { get; set; } = false;
         [JsonPropertyName("tumbleDurationSeconds")] public double TumbleDurationSeconds { get; set; } = 1.15;
         [JsonPropertyName("speechBubbleDurationSeconds")] public double SpeechBubbleDurationSeconds { get; set; } = 2.2;
         [JsonPropertyName("idleMinDurationSeconds")] public double IdleMinDurationSeconds { get; set; } = 2.0;

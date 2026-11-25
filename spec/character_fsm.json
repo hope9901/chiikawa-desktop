@@ -97,6 +97,7 @@
     "holdThresholdSeconds": 0.18,
     "clickCryDurationSeconds": 1.6,
     "playFullSongOnClick": true,
+    "allowConcurrentSinging": false,
     "tumbleDurationSeconds": 1.15,
     "speechBubbleDurationSeconds": 2.2,
     "idleMinDurationSeconds": 2.0,

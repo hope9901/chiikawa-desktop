@@ -133,6 +133,7 @@ public struct CharacterFSMSpec: Codable {
         public let holdThresholdSeconds: Double
         public let clickCryDurationSeconds: Double
         public let playFullSongOnClick: Bool
+        public let allowConcurrentSinging: Bool
         public let tumbleDurationSeconds: Double
         public let speechBubbleDurationSeconds: Double
         public let idleMinDurationSeconds: Double

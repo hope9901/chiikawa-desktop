@@ -44,7 +44,7 @@ public sealed class AudioAssetPlayer
         return new List<string>();
     }
 
-    public double? ToggleOrPlayClickSong(CharacterFSMSpec.CharacterProfileSpec profile)
+    public double? ToggleOrPlayClickSong(CharacterFSMSpec.CharacterProfileSpec profile, bool allowConcurrent = false)
     {
         if (!profile.PlaysSongOnClick) return null;
 
@@ -52,6 +52,11 @@ public sealed class AudioAssetPlayer
         {
             StopSong(profile.Id);
             return null;
+        }
+
+        if (!allowConcurrent && _activePlayers.Keys.Any(id => id != profile.Id))
+        {
+            return -1.0;
         }
 
         var files = ResolveAudioFiles(profile.AudioFolder);

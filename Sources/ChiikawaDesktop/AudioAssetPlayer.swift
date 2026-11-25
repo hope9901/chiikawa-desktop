@@ -43,15 +43,23 @@ public final class AudioAssetPlayer {
     }
 
     /// Toggles or plays a song in `profile.audioFolder` for the given character.
-    /// If already playing, stops the song and returns `nil` (so clicking again stops singing).
-    /// Otherwise starts playback and returns the full audio duration in seconds.
+    /// - If this character is already singing: stops its song and returns `nil`.
+    /// - If `allowConcurrentSinging == false` and ANOTHER character is currently singing: refuses to start a second song and returns `-1.0`.
+    /// - Otherwise starts playback and returns the full audio duration in seconds.
     @discardableResult
-    public func toggleOrPlayClickSong(for profile: CharacterFSMSpec.CharacterProfileSpec) -> Double? {
+    public func toggleOrPlayClickSong(
+        for profile: CharacterFSMSpec.CharacterProfileSpec,
+        allowConcurrent: Bool = false
+    ) -> Double? {
         guard profile.playsSongOnClick else { return nil }
 
         if isPlaying(for: profile.id) {
             stopSong(for: profile.id)
             return nil
+        }
+
+        if !allowConcurrent && isAnyOtherCharacterPlaying(except: profile.id) {
+            return -1.0
         }
 
         let files = resolveAudioFiles(for: profile.audioFolder)
@@ -69,6 +77,15 @@ public final class AudioAssetPlayer {
             NSLog("[ChiikawaDesktop] Failed to play audio \(selectedURL.lastPathComponent): \(error)")
             return nil
         }
+    }
+
+    public func isAnyOtherCharacterPlaying(except characterID: String) -> Bool {
+        for (id, player) in activePlayers where id != characterID {
+            if player.isPlaying {
+                return true
+            }
+        }
+        return false
     }
 
     public func stopSong(for characterID: String) {
