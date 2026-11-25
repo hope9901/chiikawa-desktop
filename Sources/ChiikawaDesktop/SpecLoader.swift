@@ -204,23 +204,19 @@ public final class SpecBundle {
 
     public static func loadDefault() throws -> SpecBundle {
         let fileManager = FileManager.default
-        let currentDir = URL(fileURLWithPath: fileManager.currentDirectoryPath)
-        let projectDirFromSource = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let candidateDirs: [URL] = [
-            Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("spec"),
-            projectDirFromSource.appendingPathComponent("spec"),
-            currentDir.appendingPathComponent("spec"),
-            Bundle.main.resourceURL?.appendingPathComponent("spec")
-        ].compactMap { $0 }
-
-        for dir in candidateDirs {
-            if fileManager.fileExists(atPath: dir.appendingPathComponent("physics_and_world.json").path) {
-                return try SpecBundle(specDirectoryURL: dir)
-            }
+        // 1st priority: Inside the .app bundle's own Contents/Resources/spec
+        // Reading inside Bundle.main.resourceURL NEVER triggers macOS TCC folder permission prompts (even when the .app is on Desktop/Downloads)!
+        if let bundleRes = Bundle.main.resourceURL?.appendingPathComponent("spec"),
+           fileManager.fileExists(atPath: bundleRes.appendingPathComponent("physics_and_world.json").path) {
+            return try SpecBundle(specDirectoryURL: bundleRes)
         }
+
+        // Fallback for command-line execution outside an .app bundle
+        let currentDir = URL(fileURLWithPath: fileManager.currentDirectoryPath).appendingPathComponent("spec")
+        if fileManager.fileExists(atPath: currentDir.appendingPathComponent("physics_and_world.json").path) {
+            return try SpecBundle(specDirectoryURL: currentDir)
+        }
+
         throw NSError(
             domain: "SpecLoader",
             code: 404,

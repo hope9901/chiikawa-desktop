@@ -43,4 +43,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
+# Remove extended quarantine/provenance attributes and apply a stable ad-hoc code signature
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+codesign --force --deep --sign - --identifier "com.chiikawa.desktop" "$APP_BUNDLE" 2>/dev/null || true
+
 echo "✅ Built $APP_BUNDLE and $PROJECT_DIR/ChiikawaDesktop"

@@ -18,25 +18,16 @@ public final class SpriteAssetRepository {
 
     private static func resolveAssetsRoot(folderName: String) -> URL {
         let fm = FileManager.default
-        let currentDir = URL(fileURLWithPath: fm.currentDirectoryPath)
-        let projectDirFromSource = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        // Prioritize live project assets/ directory before frozen .app bundle Resources
-        let candidates: [URL] = [
-            Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent(folderName),
-            projectDirFromSource.appendingPathComponent(folderName),
-            currentDir.appendingPathComponent(folderName),
-            Bundle.main.resourceURL?.appendingPathComponent(folderName)
-        ].compactMap { $0 }
-
-        for dir in candidates {
-            if fm.fileExists(atPath: dir.path) {
-                return dir
-            }
+        // 1st priority: Inside the .app bundle's own Contents/Resources/assets
+        // Reading inside Bundle.main.resourceURL NEVER triggers macOS TCC Desktop/Documents folder permission prompts!
+        if let bundleAssets = Bundle.main.resourceURL?.appendingPathComponent(folderName),
+           fm.fileExists(atPath: bundleAssets.path) {
+            return bundleAssets
         }
-        return currentDir.appendingPathComponent(folderName)
+
+        // Fallback for raw CLI binary execution
+        let currentDir = URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent(folderName)
+        return currentDir
     }
 
     public func preloadAll() {

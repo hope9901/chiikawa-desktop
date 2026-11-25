@@ -12,20 +12,16 @@ public final class AudioAssetPlayer {
 
     private func resolveAudioFiles(for audioFolder: String) -> [URL] {
         let fm = FileManager.default
-        let currentDir = URL(fileURLWithPath: fm.currentDirectoryPath)
-        let projectDirFromSource = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        // Prioritize the live project directory (next to ChiikawaDesktop.app) before the frozen .app bundle Resources
-        let candidateRoots: [URL] = [
-            Bundle.main.bundleURL.deletingLastPathComponent(),
-            projectDirFromSource,
-            currentDir,
-            Bundle.main.resourceURL
-        ].compactMap { $0 }
-
         let validExts: Set<String> = ["mp3", "wav", "m4a", "aac", "caf", "ogg"]
+
+        // 1st priority: Inside the .app bundle's own Contents/Resources/assets/<id>/audio
+        // Reading inside Bundle.main.resourceURL NEVER triggers macOS TCC Desktop/Documents folder permission prompts!
+        var candidateRoots: [URL] = []
+        if let resURL = Bundle.main.resourceURL {
+            candidateRoots.append(resURL)
+        } else {
+            candidateRoots.append(URL(fileURLWithPath: fm.currentDirectoryPath))
+        }
 
         for root in candidateRoots {
             let folderURL = root.appendingPathComponent(audioFolder)

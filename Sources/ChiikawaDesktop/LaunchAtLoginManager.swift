@@ -44,7 +44,6 @@ public final class LaunchAtLoginManager {
             let plistDict: [String: Any] = [
                 "Label": label,
                 "ProgramArguments": [executablePath],
-                "WorkingDirectory": workingDirectoryPath,
                 "RunAtLoad": true,
                 "KeepAlive": false,
                 "ProcessType": "Interactive"
