@@ -7,6 +7,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     private var physicsWorld: PhysicsWorld!
 
     private var overlayWindow: NSWindow!
+    private var secondaryWindows: [NSWindow] = []
     private var overlayView: OverlayView!
     private var statusItem: NSStatusItem!
 
@@ -47,24 +48,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     }
 
     private func setupOverlayWindow() {
-        let screenFrame = WindowTracker.virtualDesktopFrame
+        let screens = NSScreen.screens
+        let primaryFrame = screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 
-        overlayWindow = NSWindow(
-            contentRect: screenFrame,
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        overlayWindow.isOpaque = false
-        overlayWindow.backgroundColor = .clear
-        overlayWindow.hasShadow = false
-        overlayWindow.level = .floating
-        overlayWindow.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
-        overlayWindow.ignoresMouseEvents = true
-        overlayWindow.acceptsMouseMovedEvents = true
+        overlayWindow = makeTransparentOverlayWindow(frame: primaryFrame)
 
         overlayView = OverlayView(
-            frame: NSRect(origin: .zero, size: screenFrame.size),
+            frame: NSRect(origin: .zero, size: primaryFrame.size),
             specBundle: specBundle,
             windowTracker: windowTracker,
             physicsWorld: physicsWorld
@@ -73,6 +63,50 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
 
         overlayWindow.contentView = overlayView
         overlayWindow.orderFrontRegardless()
+
+        rebuildSecondaryMonitorWindows()
+    }
+
+    private func makeTransparentOverlayWindow(frame: NSRect) -> NSWindow {
+        let win = NSWindow(
+            contentRect: frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        win.isOpaque = false
+        win.backgroundColor = .clear
+        win.hasShadow = false
+        win.level = .floating
+        win.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        win.ignoresMouseEvents = true
+        win.acceptsMouseMovedEvents = true
+        win.isReleasedWhenClosed = false
+        return win
+    }
+
+    private func rebuildSecondaryMonitorWindows() {
+        for win in secondaryWindows {
+            win.orderOut(nil)
+        }
+        secondaryWindows.removeAll()
+        overlayView.mirrorViews.removeAll()
+
+        let screens = NSScreen.screens
+        guard screens.count > 1 else { return }
+
+        for screen in screens.dropFirst() {
+            let sFrame = screen.frame
+            let win = makeTransparentOverlayWindow(frame: sFrame)
+            let mirror = MonitorMirrorView(
+                frame: NSRect(origin: .zero, size: sFrame.size),
+                primaryView: overlayView
+            )
+            win.contentView = mirror
+            win.orderFrontRegardless()
+            secondaryWindows.append(win)
+            overlayView.mirrorViews.append(mirror)
+        }
     }
 
     private func setupStatusBarMenu() {
@@ -171,16 +205,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 
-        // Resize overlay window if monitor resolution, multi-monitor layout, or Dock geometry changes
+        // Resize overlay windows if monitor resolution, multi-monitor layout, or Dock geometry changes
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            let unionFrame = WindowTracker.virtualDesktopFrame
-            self.overlayWindow.setFrame(unionFrame, display: true)
-            self.overlayView.frame = NSRect(origin: .zero, size: unionFrame.size)
+            let primaryFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            self.overlayWindow.setFrame(primaryFrame, display: true)
+            self.overlayView.frame = NSRect(origin: .zero, size: primaryFrame.size)
+            self.rebuildSecondaryMonitorWindows()
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 

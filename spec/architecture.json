@@ -21,23 +21,23 @@
   },
   "platformAbstractions": {
     "OverlayWindow": {
-      "role": "Full-screen transparent always-on-top window that renders characters with dirty-rect invalidation and dynamically toggles mouse click-through.",
+      "role": "Creates one transparent always-on-top overlay window PER connected monitor (because macOS clips a single NSWindow at monitor boundaries when 'Displays have separate Spaces' is active). Each monitor's OverlayView renders the shared characters in global virtual-desktop coordinates shifted by that monitor's origin.",
       "properties": {
         "isTransparent": true,
         "hasShadow": false,
         "alwaysOnTop": true,
-        "coversFullScreen": true
+        "oneWindowPerMonitor": true
       },
       "methods": [
         {
           "name": "setClickThrough",
           "parameters": ["ignoreMouseEvents: Bool"],
-          "description": "When true, mouse clicks pass through to underlying OS windows. When false (cursor is over a character hitbox), the overlay captures mouse events."
+          "description": "Toggled independently per monitor window: when the cursor is over a character hitbox on that monitor, that monitor's overlay window captures mouse events; otherwise clicks pass through."
         }
       ],
       "platformMappings": {
-        "macOS": "NSWindow (styleMask: .borderless, level: .floating, backgroundColor: .clear, ignoresMouseEvents)",
-        "windows": "Win32 / .NET 8 WPF Window (WindowStyle.None, AllowsTransparency=true, Topmost=true, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW toggled dynamically via SetWindowLongPtr)"
+        "macOS": "Array<NSWindow> (one per NSScreen in NSScreen.screens, styleMask: .borderless, level: .floating, backgroundColor: .clear, ignoresMouseEvents)",
+        "windows": "Win32 / .NET 8 WPF Window spanning SystemParameters.VirtualScreen (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW)"
       }
     },
     "WindowTracker": {

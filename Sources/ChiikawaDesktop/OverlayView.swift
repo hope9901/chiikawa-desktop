@@ -26,6 +26,9 @@ public final class OverlayView: NSView {
     private weak var rightClickedCharacter: CharacterEntity?
     private var lastUpdateTimestamp: TimeInterval = ProcessInfo.processInfo.systemUptime
 
+    /// Companion views on secondary monitors that mirror and render the same shared characters in their own screen space.
+    public var mirrorViews: [MonitorMirrorView] = []
+
     public init(frame: NSRect, specBundle: SpecBundle, windowTracker: WindowTracker, physicsWorld: PhysicsWorld) {
         self.specBundle = specBundle
         self.windowTracker = windowTracker
@@ -43,6 +46,33 @@ public final class OverlayView: NSView {
     }
 
     public override var isOpaque: Bool { false }
+
+    ///Offset of this primary view's window in virtual-desktop coordinates (`WindowTracker.virtualDesktopFrame.origin`).
+    public var virtualOffset: CGPoint {
+        guard let win = self.window else { return .zero }
+        let union = WindowTracker.virtualDesktopFrame
+        return CGPoint(x: win.frame.minX - union.minX, y: win.frame.minY - union.minY)
+    }
+
+    public func toVirtualPoint(_ localPt: CGPoint) -> CGPoint {
+        let off = virtualOffset
+        return CGPoint(x: localPt.x + off.x, y: localPt.y + off.y)
+    }
+
+    public func fromVirtualRect(_ virtualRect: CGRect) -> CGRect {
+        let off = virtualOffset
+        return virtualRect.offsetBy(dx: -off.x, dy: -off.y)
+    }
+
+    private func invalidateVirtualRect(_ virtualRect: CGRect) {
+        let localRect = fromVirtualRect(virtualRect)
+        if self.bounds.intersects(localRect) {
+            self.setNeedsDisplay(localRect)
+        }
+        for mirror in mirrorViews {
+            mirror.invalidateVirtualRect(virtualRect)
+        }
+    }
 
     // MARK: - Character Management (Unique per character ID, Max 4 enforced by spec)
 
@@ -63,12 +93,14 @@ public final class OverlayView: NSView {
             return false
         }
 
-        let primaryBounds = physicsWorld.usableMonitorBounds(atX: Double(self.bounds.midX))
+        let mouseScreenLoc = NSEvent.mouseLocation
+        let virtualMouseX = Double(mouseScreenLoc.x - WindowTracker.virtualDesktopFrame.minX)
+        let activeBounds = physicsWorld.usableMonitorBounds(atX: virtualMouseX)
         let margin = 120.0
-        let minSpawnX = Double(primaryBounds.minX) + margin
-        let maxSpawnX = max(minSpawnX + 10.0, Double(primaryBounds.maxX) - margin)
+        let minSpawnX = Double(activeBounds.minX) + margin
+        let maxSpawnX = max(minSpawnX + 10.0, Double(activeBounds.maxX) - margin)
         let randomX = Double.random(in: minSpawnX...maxSpawnX)
-        let spawnY = Double(primaryBounds.maxY) - 140.0
+        let spawnY = Double(activeBounds.maxY) - 140.0
 
         let entity = CharacterEntity(
             profile: profile,
@@ -79,7 +111,7 @@ public final class OverlayView: NSView {
             scaleFactor: currentScale
         )
         characters.append(entity)
-        setNeedsDisplay(entity.dirtyRect)
+        invalidateVirtualRect(entity.dirtyRect)
         return true
     }
 
@@ -89,7 +121,7 @@ public final class OverlayView: NSView {
         for target in targets {
             let oldRect = target.dirtyRect
             characters.removeAll { $0.instanceID == target.instanceID }
-            setNeedsDisplay(oldRect)
+            invalidateVirtualRect(oldRect)
         }
     }
 
@@ -107,7 +139,7 @@ public final class OverlayView: NSView {
         for char in characters {
             let oldRect = char.dirtyRect
             char.scaleFactor = scale
-            setNeedsDisplay(oldRect.union(char.dirtyRect))
+            invalidateVirtualRect(oldRect.union(char.dirtyRect))
         }
     }
 
@@ -126,7 +158,7 @@ public final class OverlayView: NSView {
             char.vx = 0
             char.vy = 0
             char.transition(to: .fall)
-            setNeedsDisplay(oldRect.union(char.dirtyRect))
+            invalidateVirtualRect(oldRect.union(char.dirtyRect))
         }
     }
 
@@ -148,89 +180,115 @@ public final class OverlayView: NSView {
         let dt = min(0.05, max(0.001, now - lastUpdateTimestamp))
         lastUpdateTimestamp = now
 
+        // If user is actively dragging a character, track global mouse location directly so dragging works seamlessly across monitor boundaries!
+        if let grabbed = grabbedCharacter {
+            let union = WindowTracker.virtualDesktopFrame
+            let mouseLoc = NSEvent.mouseLocation
+            let virtualPt = CGPoint(x: mouseLoc.x - union.minX, y: mouseLoc.y - union.minY)
+            let oldRect = grabbed.dirtyRect
+            grabbed.handleMouseDragged(to: virtualPt, dt: dt)
+            invalidateVirtualRect(oldRect.union(grabbed.dirtyRect))
+        }
+
         let platforms = windowTracker.pollPlatforms(force: false)
         let useDirtyRect = specBundle.architecture.resourceOptimizationPolicy.useDirtyRectInvalidation
+        let virtualBounds = CGRect(origin: .zero, size: WindowTracker.virtualDesktopFrame.size)
 
         for char in characters {
             let prevRect = char.dirtyRect
             char.update(
                 dt: dt,
                 platforms: platforms,
-                screenBounds: self.bounds,
+                screenBounds: virtualBounds,
                 wanderingEnabled: wanderingEnabled
             )
             let nextRect = char.dirtyRect
             if useDirtyRect {
-                setNeedsDisplay(prevRect.union(nextRect))
+                invalidateVirtualRect(prevRect.union(nextRect))
             }
         }
 
         if !useDirtyRect {
             self.needsDisplay = true
+            for mirror in mirrorViews { mirror.needsDisplay = true }
         }
 
         updateWindowClickThroughState()
     }
 
-    /// Ensures the full-screen window passes all mouse clicks through to underlying apps
-    /// UNLESS the mouse cursor is currently inside one of the characters' hitboxes (or dragging).
+    /// Ensures each monitor's overlay window passes all mouse clicks through to underlying apps
+    /// UNLESS the mouse cursor is currently inside one of the characters' hitboxes on that monitor (or dragging).
     public func updateWindowClickThroughState() {
-        guard let win = self.window else { return }
-        if grabbedCharacter != nil {
-            if win.ignoresMouseEvents {
-                win.ignoresMouseEvents = false
-            }
-            return
-        }
-
+        let union = WindowTracker.virtualDesktopFrame
         let mouseScreenLoc = NSEvent.mouseLocation
-        let localPoint = self.convert(win.convertPoint(fromScreen: mouseScreenLoc), from: nil)
-        let isHoveringCharacter = characters.contains { $0.hitboxRect.contains(localPoint) }
+        let virtualMousePt = CGPoint(x: mouseScreenLoc.x - union.minX, y: mouseScreenLoc.y - union.minY)
+        let isHoveringCharacter = characters.contains { $0.hitboxRect.contains(virtualMousePt) }
+        let shouldIgnore = (grabbedCharacter == nil) && !isHoveringCharacter
 
-        let shouldIgnore = !isHoveringCharacter
-        if win.ignoresMouseEvents != shouldIgnore {
+        if let win = self.window, win.ignoresMouseEvents != shouldIgnore {
             win.ignoresMouseEvents = shouldIgnore
+        }
+        for mirror in mirrorViews {
+            if let mWin = mirror.window, mWin.ignoresMouseEvents != shouldIgnore {
+                mWin.ignoresMouseEvents = shouldIgnore
+            }
         }
     }
 
     // MARK: - Mouse Events (Left Click / Hold / Drag / Release & Right Click Menu)
 
     public override func mouseDown(with event: NSEvent) {
-        let pt = self.convert(event.locationInWindow, from: nil)
-        if let target = characters.reversed().first(where: { $0.hitboxRect.contains(pt) }) {
-            let oldRect = target.dirtyRect
-            grabbedCharacter = target
-            target.handleMouseDown(at: pt)
-            setNeedsDisplay(oldRect.union(target.dirtyRect))
-        }
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        handleVirtualMouseDown(at: toVirtualPoint(localPt))
     }
 
     public override func mouseDragged(with event: NSEvent) {
-        guard let target = grabbedCharacter else { return }
-        let pt = self.convert(event.locationInWindow, from: nil)
-        let oldRect = target.dirtyRect
-        target.handleMouseDragged(to: pt, dt: 1.0 / 60.0)
-        setNeedsDisplay(oldRect.union(target.dirtyRect))
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        handleVirtualMouseDragged(to: toVirtualPoint(localPt))
     }
 
     public override func mouseUp(with event: NSEvent) {
-        guard let target = grabbedCharacter else { return }
-        let pt = self.convert(event.locationInWindow, from: nil)
-        let oldRect = target.dirtyRect
-        target.handleMouseUp(at: pt)
-        grabbedCharacter = nil
-        setNeedsDisplay(oldRect.union(target.dirtyRect))
-        updateWindowClickThroughState()
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        handleVirtualMouseUp(at: toVirtualPoint(localPt))
     }
 
     public override func rightMouseDown(with event: NSEvent) {
-        let pt = self.convert(event.locationInWindow, from: nil)
-        guard let target = characters.reversed().first(where: { $0.hitboxRect.contains(pt) }) else {
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        handleVirtualRightMouseDown(at: toVirtualPoint(localPt), with: event, in: self)
+    }
+
+    public func handleVirtualMouseDown(at virtualPt: CGPoint) {
+        if let target = characters.reversed().first(where: { $0.hitboxRect.contains(virtualPt) }) {
+            let oldRect = target.dirtyRect
+            grabbedCharacter = target
+            target.handleMouseDown(at: virtualPt)
+            invalidateVirtualRect(oldRect.union(target.dirtyRect))
+        }
+    }
+
+    public func handleVirtualMouseDragged(to virtualPt: CGPoint) {
+        guard let target = grabbedCharacter else { return }
+        let oldRect = target.dirtyRect
+        target.handleMouseDragged(to: virtualPt, dt: 1.0 / 60.0)
+        invalidateVirtualRect(oldRect.union(target.dirtyRect))
+    }
+
+    public func handleVirtualMouseUp(at virtualPt: CGPoint) {
+        guard let target = grabbedCharacter else { return }
+        let oldRect = target.dirtyRect
+        target.handleMouseUp(at: virtualPt)
+        grabbedCharacter = nil
+        invalidateVirtualRect(oldRect.union(target.dirtyRect))
+        updateWindowClickThroughState()
+    }
+
+    public func handleVirtualRightMouseDown(at virtualPt: CGPoint, with event: NSEvent, in view: NSView) {
+        guard let target = characters.reversed().first(where: { $0.hitboxRect.contains(virtualPt) }) else {
             return
         }
         rightClickedCharacter = target
         let menu = buildContextMenu(for: target)
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
+        NSMenu.popUpContextMenu(menu, with: event, for: view)
     }
 
     private func buildContextMenu(for character: CharacterEntity) -> NSMenu {
@@ -390,11 +448,19 @@ public final class OverlayView: NSView {
 
     public override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        drawCharacters(in: ctx, dirtyRect: dirtyRect, virtualOffset: virtualOffset)
+    }
+
+    public func drawCharacters(in ctx: CGContext, dirtyRect: NSRect, virtualOffset: CGPoint) {
+        ctx.saveGState()
+        ctx.translateBy(x: -virtualOffset.x, y: -virtualOffset.y)
+        let virtualDirty = dirtyRect.offsetBy(dx: virtualOffset.x, dy: virtualOffset.y)
 
         for char in characters {
-            guard char.dirtyRect.intersects(dirtyRect) else { continue }
+            guard char.dirtyRect.intersects(virtualDirty) else { continue }
             drawCharacter(char, in: ctx)
         }
+        ctx.restoreGState()
     }
 
     private func drawCharacter(_ char: CharacterEntity, in ctx: CGContext) {
@@ -814,6 +880,74 @@ public final class OverlayView: NSView {
 
         attrStr.draw(at: CGPoint(x: bubbleRect.minX + padX, y: bubbleRect.minY + padY))
         ctx.restoreGState()
+    }
+}
+
+// MARK: - Secondary Monitor Mirror View
+
+/// Dedicated per-monitor NSView for secondary displays so macOS "Displays have separate Spaces"
+/// never clips characters when they walk or get dragged onto another monitor.
+public final class MonitorMirrorView: NSView {
+    private weak var primaryView: OverlayView?
+
+    public init(frame: NSRect, primaryView: OverlayView) {
+        self.primaryView = primaryView
+        super.init(frame: frame)
+        self.wantsLayer = true
+        self.layer?.isOpaque = false
+        self.layer?.backgroundColor = NSColor.clear.cgColor
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    public override var isOpaque: Bool { false }
+
+    public var virtualOffset: CGPoint {
+        guard let win = self.window else { return .zero }
+        let union = WindowTracker.virtualDesktopFrame
+        return CGPoint(x: win.frame.minX - union.minX, y: win.frame.minY - union.minY)
+    }
+
+    public func toVirtualPoint(_ localPt: CGPoint) -> CGPoint {
+        let off = virtualOffset
+        return CGPoint(x: localPt.x + off.x, y: localPt.y + off.y)
+    }
+
+    public func invalidateVirtualRect(_ virtualRect: CGRect) {
+        let off = virtualOffset
+        let localRect = virtualRect.offsetBy(dx: -off.x, dy: -off.y)
+        if self.bounds.intersects(localRect) {
+            self.setNeedsDisplay(localRect)
+        }
+    }
+
+    public override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext,
+              let primary = primaryView else { return }
+        primary.drawCharacters(in: ctx, dirtyRect: dirtyRect, virtualOffset: virtualOffset)
+    }
+
+    public override func mouseDown(with event: NSEvent) {
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        primaryView?.handleVirtualMouseDown(at: toVirtualPoint(localPt))
+    }
+
+    public override func mouseDragged(with event: NSEvent) {
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        primaryView?.handleVirtualMouseDragged(to: toVirtualPoint(localPt))
+    }
+
+    public override func mouseUp(with event: NSEvent) {
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        primaryView?.handleVirtualMouseUp(at: toVirtualPoint(localPt))
+    }
+
+    public override func rightMouseDown(with event: NSEvent) {
+        let localPt = self.convert(event.locationInWindow, from: nil)
+        primaryView?.handleVirtualRightMouseDown(at: toVirtualPoint(localPt), with: event, in: self)
     }
 }
 
