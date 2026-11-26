@@ -130,6 +130,7 @@ public struct CharacterFSMSpec: Codable {
         public let tumbleDurationSeconds: Double
         public let tumbleFPS: Double
         public let catchphrases: [String]
+        public let stateSpeeches: [String: String]?
     }
 
     public struct InteractionTimingsSpec: Codable {

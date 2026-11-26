@@ -346,7 +346,7 @@ public sealed class CharacterEntity
                     Y = winSeg.Y;
                     CurrentPlatform = winSeg;
                     _climbActionCooldown = 1.5;
-                    ShowSpeech("영차! 올라왔다! ( ˶ˆᗜˆ˵ )");
+                    ShowSpeech(SpeechFor("CLIMB_TOP", "영차! 올라왔다! ( ˶ˆᗜˆ˵ )"));
                     Transition(CharacterStateID.WALK);
                     return;
                 }
@@ -500,6 +500,9 @@ public sealed class CharacterEntity
         }
     }
 
+    private string SpeechFor(string key, string fallback) =>
+        Profile.StateSpeeches != null && Profile.StateSpeeches.TryGetValue(key, out var text) ? text : fallback;
+
     private void StartStepJump(PlatformSegment segment, double landingX)
     {
         _jumpStartX = X;
@@ -508,7 +511,7 @@ public sealed class CharacterEntity
         _jumpTargetY = segment.Y;
         _jumpTargetPlatform = segment;
         FacingRight = landingX >= X;
-        ShowSpeech("폴짝! ♪");
+        ShowSpeech(SpeechFor("JUMP_STEP", "폴짝! ♪"));
         Transition(CharacterStateID.JUMP_STEP);
     }
 
@@ -521,7 +524,7 @@ public sealed class CharacterEntity
         CurrentPlatform = target;
         X = edgeX;
         FacingRight = onLeftEdge;
-        ShowSpeech("영차.. 영차..!");
+        ShowSpeech(SpeechFor("CLIMB_WALL", "영차.. 영차..!"));
         Transition(CharacterStateID.CLIMB_WALL);
     }
 
@@ -557,10 +560,28 @@ public sealed class CharacterEntity
         }
         _lastMousePosition = point;
 
-        double dist = Math.Hypot(point.X - _mousePressOrigin.X, point.Y - _mousePressOrigin.Y);
+        double dist = double.Hypot(point.X - _mousePressOrigin.X, point.Y - _mousePressOrigin.Y);
         if (State == CharacterStateID.CRY_CLICK && dist > 5.0)
         {
             Transition(CharacterStateID.DRAGGED_STRUGGLE);
+        }
+    }
+
+    public void HandleMouseCancel()
+    {
+        if (!IsMousePressed) return;
+        IsMousePressed = false;
+
+        if (State == CharacterStateID.DRAGGED_STRUGGLE)
+        {
+            Vx = 0.0;
+            Vy = -60.0;
+            Transition(CharacterStateID.FALL_FROM_GRAB);
+        }
+        else if (State == CharacterStateID.CRY_CLICK)
+        {
+            // Cancelled capture: do NOT trigger single-click song/cry; return cleanly to IDLE
+            Transition(CharacterStateID.IDLE);
         }
     }
 
@@ -584,7 +605,7 @@ public sealed class CharacterEntity
             {
                 if (songDuration < 0)
                 {
-                    ShowSpeech("지금은 친구가 노래 부르는 중이야! 🎵");
+                    ShowSpeech(SpeechFor("SONG_BUSY", "지금은 친구가 노래 부르는 중이야! 🎵"));
                     Transition(CharacterStateID.IDLE);
                 }
                 else
@@ -631,7 +652,7 @@ public sealed class CharacterEntity
                 break;
             case CharacterStateID.CLIMB_REST:
                 TargetStateDuration = _physics.JumpAndClimb.ClimbRestDurationSeconds;
-                ShowSpeech("헉헉.. 잠깐만 쉬자.. 💦");
+                ShowSpeech(SpeechFor("CLIMB_REST", "헉헉.. 잠깐만 쉬자.. 💦"));
                 break;
             case CharacterStateID.CRY_CLICK:
                 TargetStateDuration = timings.ClickCryDurationSeconds;
@@ -639,7 +660,7 @@ public sealed class CharacterEntity
                 break;
             case CharacterStateID.DRAGGED_STRUGGLE:
                 AudioAssetPlayer.Shared.StopSong(Profile.Id);
-                ShowSpeech("으아아앙!! 놔줘~!! 💦");
+                ShowSpeech(SpeechFor("DRAGGED_STRUGGLE", "으아아앙!! 놔줘~!! 💦"));
                 break;
             case CharacterStateID.FALL:
                 ClimbingWindowID = 0;
@@ -647,11 +668,11 @@ public sealed class CharacterEntity
             case CharacterStateID.FALL_FROM_GRAB:
                 ClimbingWindowID = 0;
                 AudioAssetPlayer.Shared.StopSong(Profile.Id);
-                ShowSpeech("와아아앗~!!");
+                ShowSpeech(SpeechFor("FALL_FROM_GRAB", "와아아앗~!!"));
                 break;
             case CharacterStateID.TUMBLE:
                 TargetStateDuration = Profile.TumbleDurationSeconds;
-                ShowSpeech("철푸덕..! @~@");
+                ShowSpeech(SpeechFor("TUMBLE", "철푸덕..! @~@"));
                 break;
         }
     }

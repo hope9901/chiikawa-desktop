@@ -7,8 +7,9 @@
 /ChiikawaDesktop.app/
 *.dSYM/
 
-# Backup raw sprite sheets & intermediate sprite-gen folders
+# Backup raw sprite sheets, intermediate sprite-gen folders, & promo videos
 assets/*/_source_sheets/
 assets/*/_sprite_gen/
 assets/*/base.png
 *-backup-*.zip
+*.mp4

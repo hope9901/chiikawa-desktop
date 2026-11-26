@@ -181,10 +181,16 @@ public sealed class OverlayWindow : Window
     private Point GetMouseBottomLeftPoint()
     {
         GetCursorPos(out POINT pt);
+        // Use WPF PointFromScreen on the canvas so multi-monitor offsets and per-monitor DPI match canvas mouse events 1:1
+        if (PresentationSource.FromVisual(_canvas) != null)
+        {
+            Point localTopDown = _canvas.PointFromScreen(new Point(pt.X, pt.Y));
+            return new Point(localTopDown.X, _canvas.ActualHeight > 0 ? _canvas.ActualHeight - localTopDown.Y : Height - localTopDown.Y);
+        }
         double dpi = GetDpiForWindow(_hwnd) / 96.0;
         if (dpi <= 0) dpi = 1.0;
-        double x = pt.X / dpi;
-        double yFromTop = pt.Y / dpi;
+        double x = (pt.X / dpi) - Left;
+        double yFromTop = (pt.Y / dpi) - Top;
         return new Point(x, Height - yFromTop);
     }
 
@@ -215,15 +221,17 @@ public sealed class OverlayWindow : Window
         }
     }
 
-    public void HandleCanvasMouseDown(Point bottomLeftPt)
+    public bool HandleCanvasMouseDown(Point bottomLeftPt)
     {
         var target = Characters.AsEnumerable().Reverse().FirstOrDefault(c => c.HitboxRect.Contains(bottomLeftPt));
         if (target != null)
         {
             _grabbedCharacter = target;
             target.HandleMouseDown(bottomLeftPt);
-            CaptureMouse();
+            UpdateClickThroughState();
+            return true;
         }
+        return false;
     }
 
     public void HandleCanvasMouseMove(Point bottomLeftPt)
@@ -235,9 +243,20 @@ public sealed class OverlayWindow : Window
     {
         if (_grabbedCharacter != null)
         {
-            _grabbedCharacter.HandleMouseUp(bottomLeftPt);
+            var target = _grabbedCharacter;
             _grabbedCharacter = null;
-            ReleaseMouseCapture();
+            target.HandleMouseUp(bottomLeftPt);
+            UpdateClickThroughState();
+        }
+    }
+
+    public void HandleCanvasMouseCancel()
+    {
+        if (_grabbedCharacter != null)
+        {
+            var target = _grabbedCharacter;
+            _grabbedCharacter = null;
+            target.HandleMouseCancel();
             UpdateClickThroughState();
         }
     }
@@ -413,6 +432,8 @@ public sealed class OverlayWindow : Window
         quitItem.Click += (_, _) => Application.Current.Shutdown();
         menu.Items.Add(quitItem);
 
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        Activate();
         menu.IsOpen = true;
     }
 
@@ -448,23 +469,44 @@ public sealed class OverlayCanvas : FrameworkElement
         MouseLeftButtonDown += (_, e) =>
         {
             var pos = e.GetPosition(this);
-            _window.HandleCanvasMouseDown( new Point(pos.X, _window.Height - pos.Y) );
+            double h = ActualHeight > 0 ? ActualHeight : _window.Height;
+            if (_window.HandleCanvasMouseDown(new Point(pos.X, h - pos.Y)))
+            {
+                CaptureMouse();
+                e.Handled = true;
+            }
         };
         MouseMove += (_, e) =>
         {
             var pos = e.GetPosition(this);
-            _window.HandleCanvasMouseMove( new Point(pos.X, _window.Height - pos.Y) );
+            double h = ActualHeight > 0 ? ActualHeight : _window.Height;
+            _window.HandleCanvasMouseMove(new Point(pos.X, h - pos.Y));
         };
         MouseLeftButtonUp += (_, e) =>
         {
             var pos = e.GetPosition(this);
-            _window.HandleCanvasMouseUp( new Point(pos.X, _window.Height - pos.Y) );
+            double h = ActualHeight > 0 ? ActualHeight : _window.Height;
+            _window.HandleCanvasMouseUp(new Point(pos.X, h - pos.Y));
+            if (IsMouseCaptured) ReleaseMouseCapture();
+            e.Handled = true;
+        };
+        LostMouseCapture += (_, _) =>
+        {
+            _window.HandleCanvasMouseCancel();
         };
         MouseRightButtonDown += (_, e) =>
         {
             var pos = e.GetPosition(this);
-            _window.HandleCanvasRightClick( new Point(pos.X, _window.Height - pos.Y) );
+            double h = ActualHeight > 0 ? ActualHeight : _window.Height;
+            _window.HandleCanvasRightClick(new Point(pos.X, h - pos.Y));
+            e.Handled = true;
         };
+    }
+
+    protected override HitTestResult HitTestCore(PointHitTestParameters hitTestParameters)
+    {
+        // Ensure transparent regions inside the canvas still deliver mouse events whenever WS_EX_TRANSPARENT is disabled
+        return new PointHitTestResult(this, hitTestParameters.HitPoint);
     }
 
     protected override void OnRender(DrawingContext dc)

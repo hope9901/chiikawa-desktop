@@ -154,6 +154,7 @@ public sealed class CharacterFSMSpec
         [JsonPropertyName("tumbleDurationSeconds")] public double TumbleDurationSeconds { get; set; } = 1.15;
         [JsonPropertyName("tumbleFPS")] public double TumbleFPS { get; set; } = 8.0;
         [JsonPropertyName("catchphrases")] public List<string> Catchphrases { get; set; } = new();
+        [JsonPropertyName("stateSpeeches")] public Dictionary<string, string>? StateSpeeches { get; set; }
     }
 
     public sealed class InteractionTimingsSpec

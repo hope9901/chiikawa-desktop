@@ -28,7 +28,10 @@
   cd chiikawa-desktop
   ./run_macos.sh
   ```
-- **Windows (Windows 10/11, .NET 8 설치 환경)**: 폴더 안의 **`build_windows.bat`**을 더블클릭하면 `build_windows\ChiikawaDesktop.exe`가 생성됩니다.
+- **Windows (Windows 10/11)**:
+  - 소스 빌드에는 **.NET 8 SDK**가 필요합니다.
+  - 폴더 안의 **`build_windows.bat`**을 더블클릭하면 `.NET 8 SDK` 설치 여부를 자동으로 확인하고, 없는 경우 동의를 받아 WinGet으로 자동 설치한 뒤 `build_windows\ChiikawaDesktop.exe`를 생성합니다.
+  - WinGet을 사용할 수 없는 환경이라면 [.NET 8 SDK 공식 다운로드 페이지](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)에서 수동 설치 후 `build_windows.bat`을 실행해 주세요.
 
 ---
 

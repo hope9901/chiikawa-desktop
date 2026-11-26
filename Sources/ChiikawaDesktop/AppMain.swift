@@ -24,6 +24,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // Prevent duplicate instances in the same user session
+        if let bundleID = Bundle.main.bundleIdentifier {
+            let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            if running.count > 1 {
+                NSApp.terminate(nil)
+                return
+            }
+        }
+
         do {
             specBundle = try SpecBundle.loadDefault()
         } catch {

@@ -402,7 +402,7 @@ public final class CharacterEntity {
                 y = winSeg.y
                 currentPlatform = winSeg
                 climbActionCooldown = 1.5
-                showSpeech("영차! 올라왔다! ( ˶ˆᗜˆ˵ )")
+                showSpeech(speech(for: "CLIMB_TOP", fallback: "영차! 올라왔다! ( ˶ˆᗜˆ˵ )"))
                 transition(to: .walk)
                 return
             }
@@ -571,6 +571,10 @@ public final class CharacterEntity {
         }
     }
 
+    private func speech(for key: String, fallback: String) -> String {
+        return profile.stateSpeeches?[key] ?? fallback
+    }
+
     // MARK: - Jump & Climb Initiators
 
     private func startStepJump(to segment: PlatformSegment, landingX: Double) {
@@ -580,7 +584,7 @@ public final class CharacterEntity {
         jumpTargetY = segment.y
         jumpTargetPlatform = segment
         facingRight = landingX >= x
-        showSpeech("폴짝! ♪")
+        showSpeech(speech(for: "JUMP_STEP", fallback: "폴짝! ♪"))
         transition(to: .jumpStep)
     }
 
@@ -592,7 +596,7 @@ public final class CharacterEntity {
         currentPlatform = target
         x = edgeX
         facingRight = onLeftEdge
-        showSpeech("영차.. 영차..!")
+        showSpeech(speech(for: "CLIMB_WALL", fallback: "영차.. 영차..!"))
         transition(to: .climbWall)
     }
 
@@ -646,7 +650,7 @@ public final class CharacterEntity {
             ) {
                 if songDuration < 0 {
                     // Another character is already singing -> do not sing concurrently!
-                    showSpeech("지금은 친구가 노래 부르는 중이야! 🎵", duration: 2.0)
+                    showSpeech(speech(for: "SONG_BUSY", fallback: "지금은 친구가 노래 부르는 중이야! 🎵"), duration: 2.0)
                     transition(to: .idle)
                 } else {
                     targetStateDuration = stateElapsed + songDuration
@@ -689,22 +693,22 @@ public final class CharacterEntity {
             break
         case .climbRest:
             targetStateDuration = physics.jumpAndClimb.climbRestDurationSeconds
-            showSpeech("헉헉.. 잠깐만 쉬자.. 💦")
+            showSpeech(speech(for: "CLIMB_REST", fallback: "헉헉.. 잠깐만 쉬자.. 💦"))
         case .cryClick:
             targetStateDuration = timings.clickCryDurationSeconds
             showSpeech(profile.clickSpeech)
         case .draggedStruggle:
             AudioAssetPlayer.shared.stopSong(for: profile.id)
-            showSpeech("으아아앙!! 놔줘~!! 💦")
+            showSpeech(speech(for: "DRAGGED_STRUGGLE", fallback: "으아아앙!! 놔줘~!! 💦"))
         case .fall:
             climbingWindowID = 0
         case .fallFromGrab:
             climbingWindowID = 0
             AudioAssetPlayer.shared.stopSong(for: profile.id)
-            showSpeech("와아아앗~!!")
+            showSpeech(speech(for: "FALL_FROM_GRAB", fallback: "와아아앗~!!"))
         case .tumble:
             targetStateDuration = profile.tumbleDurationSeconds
-            showSpeech("철푸덕..! @~@")
+            showSpeech(speech(for: "TUMBLE", fallback: "철푸덕..! @~@"))
         }
     }
 }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.5.1",
+  "schemaVersion": "1.5.2",
   "projectName": "ChiikawaDesktop",
   "description": "Platform-agnostic architecture specification for the Desktop Chiikawa pet application. Inspired by ssskay/desktop-chiikawa-macos with added window-top walking physics, window-riding movement tracking, small-step jumping, window-edge climbing with mid-climb rest, cry/struggle/tumble interactions, and strict low-resource optimization.",
   "designPrinciples": [

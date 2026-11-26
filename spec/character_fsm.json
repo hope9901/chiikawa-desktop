@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.5.1",
+  "schemaVersion": "1.5.2",
   "initialState": "FALL",
   "maxCharacters": 4,
   "assetsRootDirectory": "assets",
@@ -44,7 +44,17 @@
       "canRestDuringClimb": true,
       "tumbleDurationSeconds": 0.6,
       "tumbleFPS": 12.0,
-      "catchphrases": ["어라라..?", "어떻게든 되겠지!", "으아아앙!", "( ˊᵕˋ )♡"]
+      "catchphrases": ["어라라..?", "어떻게든 되겠지!", "으아아앙!", "( ˊᵕˋ )♡"],
+      "stateSpeeches": {
+        "JUMP_STEP": "폴짝! ♪",
+        "CLIMB_WALL": "영차.. 영차..!",
+        "CLIMB_TOP": "영차! 올라왔다! ( ˶ˆᗜˆ˵ )",
+        "CLIMB_REST": "헉헉.. 잠깐만 쉬자.. 💦",
+        "DRAGGED_STRUGGLE": "으아아앙!! 놔줘~!! 💦",
+        "FALL_FROM_GRAB": "와아아앗~!!",
+        "TUMBLE": "철푸덕..! @~@",
+        "SONG_BUSY": "지금은 친구가 노래 부르는 중이야! 🎵"
+      }
     },
     {
       "id": "chiikawa",
@@ -52,7 +62,7 @@
       "assetFolder": "assets/chiikawa",
       "audioFolder": "assets/chiikawa/audio",
       "playsSongOnClick": false,
-      "clickSpeech": "히익.. 훌쩍 ( ´•̥×•̥` )",
+      "clickSpeech": "ㅠ_ㅠ",
       "primaryColorHex": "#FFFDF9",
       "accentColorHex": "#FFB7C5",
       "earStyle": "round",
@@ -62,7 +72,17 @@
       "canRestDuringClimb": true,
       "tumbleDurationSeconds": 0.6,
       "tumbleFPS": 12.0,
-      "catchphrases": ["( ´•̥×•̥` )", "와..!", "우와아앙!!", "( ˶ˆᗜˆ˵ )"]
+      "catchphrases": [">_<", "ㅇ_ㅇ", "^o^", "ㅎ_ㅎ"],
+      "stateSpeeches": {
+        "JUMP_STEP": "^o^",
+        "CLIMB_WALL": ">_<",
+        "CLIMB_TOP": "^ㅂ^",
+        "CLIMB_REST": "ㅡ_ㅡ;;",
+        "DRAGGED_STRUGGLE": "T_T",
+        "FALL_FROM_GRAB": "ㅇㅁㅇ",
+        "TUMBLE": "@_@",
+        "SONG_BUSY": "ㅇ_ㅇ"
+      }
     },
     {
       "id": "usagi",
@@ -70,7 +90,7 @@
       "assetFolder": "assets/usagi",
       "audioFolder": "assets/usagi/audio",
       "playsSongOnClick": true,
-      "clickSpeech": "♪ 우라~ 야하~!! 🎶",
+      "clickSpeech": "♪ 우랴~ 야하~!! 🎶",
       "primaryColorHex": "#FFF3C4",
       "accentColorHex": "#FFD166",
       "earStyle": "long_rabbit",
@@ -80,7 +100,17 @@
       "canRestDuringClimb": false,
       "tumbleDurationSeconds": 1.15,
       "tumbleFPS": 8.0,
-      "catchphrases": ["우라!!", "야하~!", "하아?!", "푸루루루!"]
+      "catchphrases": ["우랴!!", "야하~!", "푸릇!", "하아?!", "푸루루루!"],
+      "stateSpeeches": {
+        "JUMP_STEP": "야하~!",
+        "CLIMB_WALL": "우랴!!",
+        "CLIMB_TOP": "야하!!",
+        "CLIMB_REST": "푸릇!",
+        "DRAGGED_STRUGGLE": "우랴아아!!",
+        "FALL_FROM_GRAB": "푸루루루!!",
+        "TUMBLE": "푸릇..!",
+        "SONG_BUSY": "하아?!"
+      }
     },
     {
       "id": "momonga",
@@ -98,7 +128,17 @@
       "canRestDuringClimb": true,
       "tumbleDurationSeconds": 1.15,
       "tumbleFPS": 8.0,
-      "catchphrases": ["귀여워해라!", "내놔!!", "으앙!! 봐라!", "( `꒳´ )"]
+      "catchphrases": ["귀여워해라!", "내놔!!", "으앙!! 봐라!", "( `꒳´ )"],
+      "stateSpeeches": {
+        "JUMP_STEP": "폴짝! ♪",
+        "CLIMB_WALL": "영차.. 영차..!",
+        "CLIMB_TOP": "봤냐! 올라왔다!",
+        "CLIMB_REST": "헉헉.. 잠깐만 쉬자.. 💦",
+        "DRAGGED_STRUGGLE": "으아아앙!! 놔줘~!! 💦",
+        "FALL_FROM_GRAB": "와아아앗~!!",
+        "TUMBLE": "철푸덕..! @~@",
+        "SONG_BUSY": "지금은 친구가 노래 부르는 중이야! 🎵"
+      }
     }
   ],
   "interactionTimings": {

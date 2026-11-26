@@ -18,7 +18,14 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$PROJECT_DIR/ChiikawaDesktop" "$APP_BUNDLE/Contents/MacOS/ChiikawaDesktop"
 rm -rf "$APP_BUNDLE/Contents/Resources/spec" "$APP_BUNDLE/Contents/Resources/assets"
 cp -R "$PROJECT_DIR/spec" "$APP_BUNDLE/Contents/Resources/spec"
-cp -R "$PROJECT_DIR/assets" "$APP_BUNDLE/Contents/Resources/assets"
+rsync -a \
+  --exclude='.DS_Store' \
+  --exclude='.gitkeep' \
+  --exclude='_source_sheets' \
+  --exclude='_sprite_gen' \
+  --exclude='base.png' \
+  --exclude='*.mp4' \
+  "$PROJECT_DIR/assets/" "$APP_BUNDLE/Contents/Resources/assets/"
 
 cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -34,7 +41,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.5.1</string>
+    <string>1.5.2</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
