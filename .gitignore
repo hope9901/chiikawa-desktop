@@ -13,3 +13,4 @@ assets/*/_sprite_gen/
 assets/*/base.png
 *-backup-*.zip
 *.mp4
+!/docs/media/intro.mp4
