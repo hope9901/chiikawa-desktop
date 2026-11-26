@@ -128,9 +128,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
     }
 
     private func setupStatusBarMenu() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.isVisible = true
         if let button = statusItem.button {
-            button.title = "🐾 치이카와"
+            if let symbol = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "치이카와 데스크톱") {
+                symbol.isTemplate = true
+                button.image = symbol
+            } else {
+                button.title = "🐾"
+            }
+            button.toolTip = "치이카와 데스크톱 (ChiikawaDesktop)"
         }
         rebuildStatusBarMenu()
     }
@@ -228,6 +235,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, OverlayViewDele
             self.overlayWindow.setFrame(primaryFrame, display: true)
             self.overlayView.frame = NSRect(origin: .zero, size: primaryFrame.size)
             self.rebuildSecondaryMonitorWindows()
+            self.statusItem?.isVisible = true
             _ = self.windowTracker.pollPlatforms(force: true)
         }
 
