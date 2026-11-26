@@ -1,5 +1,9 @@
 # 🐾 치이카와 데스크톱 (ChiikawaDesktop)
 
+[![치이카와 데스크톱 15초 소개 영상](docs/media/intro.gif)](docs/media/intro.mp4?raw=true)
+
+[소리와 함께 소개 영상 보기 (MP4)](docs/media/intro.mp4?raw=true)
+
 바탕화면과 프로그램 창 위를 자유롭게 걸어 다니는 **치이카와 데스크톱 펫** 앱입니다. (macOS & Windows 지원)
 
 ---
