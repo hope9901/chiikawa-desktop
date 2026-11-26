@@ -649,9 +649,15 @@ public final class CharacterEntity {
                 allowConcurrent: fsmSpec.interactionTimings.allowConcurrentSinging
             ) {
                 if songDuration < 0 {
-                    // Another character is already singing -> do not sing concurrently!
-                    showSpeech(speech(for: "SONG_BUSY", fallback: "지금은 친구가 노래 부르는 중이야! 🎵"), duration: 2.0)
+                    // Another character is already singing -> transition to IDLE first, then show SONG_BUSY speech if non-empty (e.g., Hachiware)
                     transition(to: .idle)
+                    let busySpeech = speech(for: "SONG_BUSY", fallback: "")
+                    if !busySpeech.isEmpty {
+                        showSpeech(busySpeech, duration: 2.5)
+                    } else {
+                        activeSpeechText = nil
+                        speechTimer = 0
+                    }
                 } else {
                     targetStateDuration = stateElapsed + songDuration
                     showSpeech(profile.clickSpeech, duration: 4.0)

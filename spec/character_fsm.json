@@ -62,7 +62,7 @@
       "assetFolder": "assets/chiikawa",
       "audioFolder": "assets/chiikawa/audio",
       "playsSongOnClick": false,
-      "clickSpeech": "ㅠ_ㅠ",
+      "clickSpeech": "(இ﹏இ`｡)",
       "primaryColorHex": "#FFFDF9",
       "accentColorHex": "#FFB7C5",
       "earStyle": "round",
@@ -72,16 +72,16 @@
       "canRestDuringClimb": true,
       "tumbleDurationSeconds": 0.6,
       "tumbleFPS": 12.0,
-      "catchphrases": [">_<", "ㅇ_ㅇ", "^o^", "ㅎ_ㅎ"],
+      "catchphrases": ["(*^▽^*)", "(｡･ω･｡)", "(´▽`ʃ♡ƪ)", "(๑˃̵ᴗ˂̵)و"],
       "stateSpeeches": {
-        "JUMP_STEP": "^o^",
-        "CLIMB_WALL": ">_<",
-        "CLIMB_TOP": "^ㅂ^",
-        "CLIMB_REST": "ㅡ_ㅡ;;",
-        "DRAGGED_STRUGGLE": "T_T",
-        "FALL_FROM_GRAB": "ㅇㅁㅇ",
-        "TUMBLE": "@_@",
-        "SONG_BUSY": "ㅇ_ㅇ"
+        "JUMP_STEP": "٩(ˊᗜˋ*)و",
+        "CLIMB_WALL": "(ง •̀_•́)ง",
+        "CLIMB_TOP": "ヽ(✿ﾟ▽ﾟ)ノ",
+        "CLIMB_REST": "(；´д｀)ゞ",
+        "DRAGGED_STRUGGLE": "(つ﹏<。)",
+        "FALL_FROM_GRAB": "(⊙_⊙;)",
+        "TUMBLE": "(✖╭╮✖)",
+        "SONG_BUSY": ""
       }
     },
     {
@@ -109,7 +109,7 @@
         "DRAGGED_STRUGGLE": "우랴아아!!",
         "FALL_FROM_GRAB": "푸루루루!!",
         "TUMBLE": "푸릇..!",
-        "SONG_BUSY": "하아?!"
+        "SONG_BUSY": ""
       }
     },
     {

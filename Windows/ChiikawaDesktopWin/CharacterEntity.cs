@@ -605,8 +605,17 @@ public sealed class CharacterEntity
             {
                 if (songDuration < 0)
                 {
-                    ShowSpeech(SpeechFor("SONG_BUSY", "지금은 친구가 노래 부르는 중이야! 🎵"));
                     Transition(CharacterStateID.IDLE);
+                    string busySpeech = SpeechFor("SONG_BUSY", "");
+                    if (!string.IsNullOrEmpty(busySpeech))
+                    {
+                        ShowSpeech(busySpeech);
+                    }
+                    else
+                    {
+                        ActiveSpeechText = null;
+                        _speechTimer = 0;
+                    }
                 }
                 else
                 {
