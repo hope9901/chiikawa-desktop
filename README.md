@@ -21,7 +21,14 @@
 2. **`ChiikawaDesktop.app`**을 더블클릭하면 바로 실행됩니다!
    > 💡 처음 실행 시 *"확인되지 않은 개발자"* 안내가 뜨면, `ChiikawaDesktop.app`을 **마우스 우클릭 → 열기**를 누르거나 터미널에 `xattr -cr ChiikawaDesktop.app`을 입력해 주세요.
 
-### 2. 소스 코드로 직접 실행하기
+### 2. 가장 쉬운 방법 (Windows 10 / 11 바로 실행)
+1. **[Releases 다운로드 페이지](https://github.com/hope9901/chiikawa-desktop/releases/latest)**에서 **`ChiikawaDesktop-Windows-x64.exe`**를 다운로드합니다. (ARM 노트북은 `ChiikawaDesktop-Windows-arm64.exe`)
+2. 다운로드한 **exe 파일을 더블클릭**하면 바로 실행됩니다. 별도 설치나 .NET 설치가 필요 없습니다.
+   > 💡 *"Windows의 PC 보호"* 창이 뜨면 **추가 정보 → 실행**을 눌러 주세요. (코드 서명이 없는 개인 프로젝트라 표시되는 안내입니다.)
+   > 💡 Windows 11의 **스마트 앱 컨트롤**이 켜져 있으면 서명되지 않은 앱이 차단될 수 있습니다. 이 경우 `Windows 보안 → 앱 및 브라우저 컨트롤 → 스마트 앱 컨트롤` 설정을 확인해 주세요.
+   > 💡 실행 중 오류가 나면 `%LOCALAPPDATA%\ChiikawaDesktop\error.log`에 로그가 남습니다. Issues에 첨부해 주시면 확인하겠습니다.
+
+### 3. 소스 코드로 직접 실행하기
 - **macOS**: 터미널에서 아래 명령어를 입력하면 자동으로 빌드 및 실행됩니다.
   ```bash
   git clone https://github.com/hope9901/chiikawa-desktop.git
@@ -30,7 +37,7 @@
   ```
 - **Windows (Windows 10/11)**:
   - 소스 빌드에는 **.NET 8 SDK**가 필요합니다.
-  - 폴더 안의 **`build_windows.bat`**을 더블클릭하면 `.NET 8 SDK` 설치 여부를 자동으로 확인하고, 없는 경우 동의를 받아 WinGet으로 자동 설치한 뒤 `build_windows\ChiikawaDesktop.exe`를 생성합니다.
+  - 폴더 안의 **`build_windows.bat`**을 더블클릭하면 `.NET 8 SDK` 설치 여부를 자동으로 확인하고, 없는 경우 동의를 받아 WinGet으로 자동 설치한 뒤 `build_windows\ChiikawaDesktop.exe`(런타임·리소스가 모두 포함된 단일 exe)를 생성합니다.
   - WinGet을 사용할 수 없는 환경이라면 [.NET 8 SDK 공식 다운로드 페이지](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)에서 수동 설치 후 `build_windows.bat`을 실행해 주세요.
 
 ---

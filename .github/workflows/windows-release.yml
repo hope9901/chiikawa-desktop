@@ -1,0 +1,116 @@
+name: Windows EXE Release
+
+# Builds the self-contained single-file Windows EXE on a real Windows runner,
+# smoke-tests that it starts, and publishes it to the GitHub release v<Version>
+# (Version is read from ChiikawaDesktopWin.csproj).
+on:
+  push:
+    branches:
+      - main
+      - claude/exciting-bell-twnva3
+    paths:
+      - "Windows/**"
+      - "assets/**"
+      - "spec/**"
+      - "build_windows.bat"
+      - ".github/workflows/windows-release.yml"
+      - ".github/release_notes/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  # Release whose macOS package is carried over when a new release is created.
+  MACOS_ASSET_FROM_TAG: v1.5.2
+  MACOS_ASSET_NAME: ChiikawaDesktop-macOS.zip
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish single-file EXEs (x64, arm64)
+        shell: pwsh
+        run: |
+          $proj = "Windows/ChiikawaDesktopWin/ChiikawaDesktopWin.csproj"
+          foreach ($rid in "win-x64", "win-arm64") {
+            dotnet publish $proj -c Release -r $rid -o "out/$rid"
+            if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $rid" }
+          }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item out/win-x64/ChiikawaDesktop.exe   dist/ChiikawaDesktop-Windows-x64.exe
+          Copy-Item out/win-arm64/ChiikawaDesktop.exe dist/ChiikawaDesktop-Windows-arm64.exe
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Smoke test (EXE starts and keeps running)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:LOCALAPPDATA "ChiikawaDesktop/error.log"
+          Remove-Item $log -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath "dist/ChiikawaDesktop-Windows-x64.exe" -PassThru
+          Start-Sleep -Seconds 25
+          $alive = -not $p.HasExited
+          if ($alive) { Stop-Process -Id $p.Id -Force }
+          if (Test-Path $log) { Get-Content $log; throw "App reported an error (see log above)." }
+          if (-not $alive) { throw "App exited early with code $($p.ExitCode)." }
+          Write-Host "EXE started and stayed alive for 25s without errors."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChiikawaDesktop-Windows
+          path: dist/*
+
+      - name: Publish to GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$xml = Get-Content "Windows/ChiikawaDesktopWin/ChiikawaDesktopWin.csproj"
+          $ver = ($xml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
+          if (-not $ver) { throw "Version not found in csproj" }
+          $tag = "v$ver"
+          $notes = ".github/release_notes/$tag.md"
+          if (-not (Test-Path $notes)) { Set-Content $notes "ChiikawaDesktop $tag" }
+
+          gh release view $tag *> $null
+          $exists = ($LASTEXITCODE -eq 0)
+          $global:LASTEXITCODE = 0
+
+          if ($exists) {
+            gh release upload $tag (Get-ChildItem dist/*).FullName --clobber
+            if ($LASTEXITCODE -ne 0) { throw "upload failed" }
+            gh release edit $tag --notes-file $notes
+          } else {
+            gh release create $tag (Get-ChildItem dist/*).FullName `
+              --title "ChiikawaDesktop $tag" --notes-file $notes --target $env:GITHUB_SHA --latest
+            if ($LASTEXITCODE -ne 0) { throw "release create failed" }
+          }
+
+          # Keep the macOS package available on the newest release.
+          $assets = gh release view $tag --json assets --jq ".assets[].name"
+          if ($assets -notcontains $env:MACOS_ASSET_NAME) {
+            New-Item -ItemType Directory -Force mac | Out-Null
+            gh release download $env:MACOS_ASSET_FROM_TAG -p $env:MACOS_ASSET_NAME -D mac
+            if ($LASTEXITCODE -eq 0 -and (Test-Path "mac/$env:MACOS_ASSET_NAME")) {
+              gh release upload $tag "mac/$env:MACOS_ASSET_NAME" --clobber
+            } else {
+              Write-Warning "Could not carry over $env:MACOS_ASSET_NAME from $env:MACOS_ASSET_FROM_TAG"
+              $global:LASTEXITCODE = 0
+            }
+          }
+          gh release view $tag

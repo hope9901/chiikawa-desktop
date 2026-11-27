@@ -59,6 +59,9 @@ public sealed class CharacterEntity
     private Point _lastMousePosition;
     private double _lastMouseVelocityX;
 
+    // True while CRY_CLICK is showing the singing animation for a playing song.
+    private bool _isSingingSong;
+
     // Speech bubble
     public string? ActiveSpeechText { get; private set; }
     private double _speechTimer;
@@ -423,7 +426,10 @@ public sealed class CharacterEntity
                         return;
                     }
 
-                    if (StateElapsed >= TargetStateDuration)
+                    // Singing ends exactly when the audio ends (MediaEnded / end of
+                    // position / playback failure), not after a guessed duration.
+                    bool songFinished = _isSingingSong && !AudioAssetPlayer.Shared.IsSongActive(Profile.Id);
+                    if (songFinished || StateElapsed >= TargetStateDuration)
                     {
                         AudioAssetPlayer.Shared.StopSong(Profile.Id);
                         Transition(CharacterStateID.IDLE);
@@ -619,6 +625,7 @@ public sealed class CharacterEntity
                 }
                 else
                 {
+                    _isSingingSong = true;
                     TargetStateDuration = StateElapsed + songDuration;
                     ShowSpeech(Profile.ClickSpeech);
                 }
@@ -640,6 +647,15 @@ public sealed class CharacterEntity
     {
         State = newState;
         StateElapsed = 0.0;
+        _isSingingSong = false;
+
+        // The song belongs to the singing (CRY_CLICK) pose only. Leaving it for any
+        // other state stops the audio so sound and animation never get out of sync.
+        // (Pressing on a singing character re-enters CRY_CLICK; releasing toggles it off.)
+        if (newState != CharacterStateID.CRY_CLICK)
+        {
+            AudioAssetPlayer.Shared.StopSong(Profile.Id);
+        }
         var timings = _fsmSpec.InteractionTimings;
 
         switch (newState)

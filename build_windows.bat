@@ -1,53 +1,74 @@
 @echo off
-setlocal EnableDelayedExpansion
+rem ==================================================================
+rem  ChiikawaDesktop Windows Builder (.NET 8 SDK)
+rem
+rem  NOTE: This file must keep Windows (CRLF) line endings and ASCII-only
+rem  text. cmd.exe misparses LF-only / UTF-8 batch files (labels are not
+rem  found, lines get garbled on Korean CP949 consoles). .gitattributes
+rem  pins this file to CRLF.
+rem ==================================================================
+setlocal EnableExtensions EnableDelayedExpansion
 
 echo ==================================================
 echo   ChiikawaDesktop Windows Builder (.NET 8 SDK)
 echo ==================================================
 echo.
 
+set "ROOT=%~dp0"
+set "PROJECT_DIR=%ROOT%Windows\ChiikawaDesktopWin"
+set "OUT_DIR=%ROOT%build_windows"
+set "OUT_EXE=%OUT_DIR%\ChiikawaDesktop.exe"
+
+set "RID=win-x64"
+if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "RID=win-arm64"
+if /i "%PROCESSOR_ARCHITEW6432%"=="ARM64" set "RID=win-arm64"
+
 set "DOTNET_CMD=dotnet"
 call :check_sdk
-if "%HAS_NET8_SDK%"=="1" goto :build_app
+if "%HAS_NET8_SDK%"=="1" goto build_app
 
-echo [안내] Windows 소스 빌드를 위해 .NET 8 SDK가 필요합니다.
-echo (현재 PC에 .NET 8 SDK가 설치되어 있지 않거나 Runtime만 설치되어 있습니다.)
+echo [INFO] The .NET 8 SDK is required to build from source.
+echo        (It is not installed, or only the .NET Runtime is installed.)
+echo        TIP: You do not need to build anything to just use the app.
+echo             Download ChiikawaDesktop-Windows-x64.exe from the Releases page:
+echo             https://github.com/hope9901/chiikawa-desktop/releases
 echo.
 
 where winget >nul 2>nul
 if errorlevel 1 (
-    echo [오류] WinGet을 찾을 수 없어 자동 설치를 진행할 수 없습니다.
-    echo 아래 공식 페이지에서 .NET 8 SDK를 직접 설치한 뒤 다시 실행해 주세요:
-    echo   https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+    echo [ERROR] WinGet was not found, so the SDK cannot be installed automatically.
+    echo         Please install the .NET 8 SDK manually and run this file again:
+    echo         https://dotnet.microsoft.com/en-us/download/dotnet/8.0
     echo.
     pause
     exit /b 1
 )
 
-set /p "INSTALL_CHOICE=WinGet으로 .NET 8 SDK를 자동 설치할까요? (Y/N): "
+set "INSTALL_CHOICE="
+set /p "INSTALL_CHOICE=Install the .NET 8 SDK with WinGet now? (Y/N): "
 if /i not "%INSTALL_CHOICE%"=="Y" (
     echo.
-    echo [취소] SDK 설치가 취소되어 빌드를 중단합니다.
-    echo 수동 설치 링크: https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+    echo [CANCELED] SDK installation was canceled. Build stopped.
+    echo            Manual download: https://dotnet.microsoft.com/en-us/download/dotnet/8.0
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo [설치] Microsoft.DotNet.SDK.8 설치 중...
+echo [INSTALL] Installing Microsoft.DotNet.SDK.8 ...
 winget install --id Microsoft.DotNet.SDK.8 --exact --source winget --accept-package-agreements --accept-source-agreements
 if errorlevel 1 (
     echo.
-    echo [오류] .NET 8 SDK 자동 설치에 실패했습니다.
-    echo 아래 공식 링크에서 수동으로 설치한 뒤 다시 실행해 주세요:
-    echo   https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+    echo [ERROR] Automatic installation of the .NET 8 SDK failed.
+    echo         Please install it manually and run this file again:
+    echo         https://dotnet.microsoft.com/en-us/download/dotnet/8.0
     echo.
     pause
     exit /b 1
 )
 
-rem 설치 직후 현재 배치 프로세스에서 dotnet.exe 경로 재탐색
+rem Re-detect dotnet.exe in this console session right after installation.
 if exist "%ProgramFiles%\dotnet\dotnet.exe" (
     set "DOTNET_CMD=%ProgramFiles%\dotnet\dotnet.exe"
     set "PATH=%ProgramFiles%\dotnet;%PATH%"
@@ -56,9 +77,9 @@ if exist "%ProgramFiles%\dotnet\dotnet.exe" (
 call :check_sdk
 if not "%HAS_NET8_SDK%"=="1" (
     echo.
-    echo [오류] .NET 8 SDK 설치 후에도 SDK를 감지하지 못했습니다.
-    echo 터미널을 새로 열거나 아래 링크에서 수동 설치 상태를 확인해 주세요:
-    echo   https://dotnet.microsoft.com/en-us/download/dotnet/8.0
+    echo [ERROR] The .NET 8 SDK still cannot be detected after installation.
+    echo         Open a new terminal and run this file again, or check:
+    echo         https://dotnet.microsoft.com/en-us/download/dotnet/8.0
     echo.
     pause
     exit /b 1
@@ -66,21 +87,27 @@ if not "%HAS_NET8_SDK%"=="1" (
 
 :build_app
 echo.
-echo [빌드] ChiikawaDesktop (Windows x64 Release) 게시 중...
-cd /d "%~dp0Windows\ChiikawaDesktopWin"
-"%DOTNET_CMD%" publish -c Release -r win-x64 --self-contained false -o "%~dp0build_windows"
-if errorlevel 1 (
+echo [BUILD] Publishing ChiikawaDesktop (%RID%, Release, self-contained single EXE) ...
+if exist "%OUT_DIR%" rmdir /s /q "%OUT_DIR%"
+pushd "%PROJECT_DIR%" || (
+    echo [ERROR] Project folder not found: %PROJECT_DIR%
+    pause
+    exit /b 1
+)
+"%DOTNET_CMD%" publish -c Release -r %RID% -o "%OUT_DIR%"
+set "PUBLISH_RC=%ERRORLEVEL%"
+popd
+if not "%PUBLISH_RC%"=="0" (
     echo.
-    echo [오류] dotnet publish 빌드에 실패했습니다. 위 오류 메시지를 확인해 주세요.
+    echo [ERROR] dotnet publish failed. See the messages above.
     echo.
     pause
     exit /b 1
 )
 
-set "OUT_EXE=%~dp0build_windows\ChiikawaDesktop.exe"
 if not exist "%OUT_EXE%" (
     echo.
-    echo [오류] 빌드가 완료되었으나 출력 파일(%OUT_EXE%)을 찾을 수 없습니다.
+    echo [ERROR] Build finished, but the output file was not found: %OUT_EXE%
     echo.
     pause
     exit /b 1
@@ -88,6 +115,7 @@ if not exist "%OUT_EXE%" (
 
 echo.
 echo Done! Executable is at: %OUT_EXE%
+echo This single EXE runs on Windows 10/11 without installing .NET.
 echo.
 pause
 exit /b 0
@@ -102,8 +130,8 @@ if errorlevel 1 (
         exit /b 0
     )
 )
-for /f "tokens=1" %%v in ('"%DOTNET_CMD%" --list-sdks 2^>nul') do (
-    echo %%v | findstr /b "8." >nul
+for /f "tokens=1" %%v in ('call "%DOTNET_CMD%" --list-sdks 2^>nul') do (
+    echo %%v| findstr /b "8." >nul
     if not errorlevel 1 set "HAS_NET8_SDK=1"
 )
 exit /b 0

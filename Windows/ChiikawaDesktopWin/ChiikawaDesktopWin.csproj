@@ -9,6 +9,34 @@
     <AssemblyName>ChiikawaDesktop</AssemblyName>
     <RootNamespace>ChiikawaDesktopWin</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <Version>1.5.3</Version>
+    <Product>ChiikawaDesktop</Product>
+    <Description>Chiikawa desktop pet (non-profit fan project)</Description>
+    <Copyright>Characters (c) Nagano. Fan-made, non-commercial.</Copyright>
+
+    <!-- Allows building the Windows EXE from macOS/Linux CI as well. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <!--
+    Distribution build: ONE self-contained ChiikawaDesktop.exe.
+    - SelfContained: the .NET 8 Desktop Runtime is bundled, so a clean Windows 10/11
+      PC (which does not ship .NET 8) can run it without installing anything.
+      (The previous framework-dependent EXE failed to start on PCs without the runtime.)
+    - IncludeNativeLibrariesForSelfExtract: bundles WPF native DLLs (wpfgfx_cor3 etc.).
+    - IncludeAllContentForSelfExtract: bundles spec/*.json and assets/* (sprites, songs);
+      they are extracted on first launch and AppContext.BaseDirectory points there.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>ko;en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
