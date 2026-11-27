@@ -13,3 +13,8 @@ assets/*/_sprite_gen/
 assets/*/base.png
 *-backup-*.zip
 *.mp4
+
+# Windows build output
+build_windows/
+Windows/ChiikawaDesktopWin/bin/
+Windows/ChiikawaDesktopWin/obj/

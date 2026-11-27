@@ -40,7 +40,8 @@ public sealed class LaunchAtLoginManager
 
             if (enabled)
             {
-                string exePath = Process.GetCurrentProcess().MainModule?.FileName
+                string exePath = Environment.ProcessPath
+                    ?? Process.GetCurrentProcess().MainModule?.FileName
                     ?? System.IO.Path.Combine(AppContext.BaseDirectory, "ChiikawaDesktop.exe");
                 key.SetValue(AppValueName, $"\"{exePath}\"");
             }
